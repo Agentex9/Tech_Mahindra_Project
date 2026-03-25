@@ -1,0 +1,28 @@
+{
+  "name": "tech-mahindra-project",
+  "version": "0.1.0",
+  "private": true,
+  "type": "module",
+  "description": "Release tooling with semantic-release and lefthook",
+  "scripts": {
+    "release": "bunx semantic-release",
+    "release:dry": "bunx semantic-release --dry-run",
+    "sync:versions": "bun scripts/sync-versions.mjs",
+    "commit:check": "bunx commitlint --from HEAD~1 --to HEAD --verbose",
+    "hooks:install": "bunx lefthook install",
+    "hooks:uninstall": "bunx lefthook uninstall",
+    "hooks:run:pre-commit": "bunx lefthook run pre-commit"
+  },
+  "devDependencies": {
+    "@commitlint/cli": "^20.5.0",
+    "@commitlint/config-conventional": "^20.5.0",
+    "@semantic-release/changelog": "^6.0.3",
+    "@semantic-release/commit-analyzer": "^13.0.1",
+    "@semantic-release/exec": "^7.1.0",
+    "@semantic-release/git": "^10.0.1",
+    "@semantic-release/github": "^12.0.6",
+    "@semantic-release/release-notes-generator": "^14.1.0",
+    "lefthook": "^2.1.4",
+    "semantic-release": "^25.0.3"
+  }
+}

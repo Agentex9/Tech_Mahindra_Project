@@ -1,0 +1,24 @@
+# Validacion de mensajes de commit
+commit-msg:
+  commands:
+    commitlint:
+      run: bunx --bun commitlint --edit {1}
+      fail_text: |
+        Commit message invalido.
+
+        Formato: tipo(scope): descripcion
+        El scope es opcional, pero recomendado para versionado por area.
+
+        Ejemplos:
+        - feat(ui): mejorar navbar responsive
+        - fix(api): corregir error en endpoint de contacto
+        - chore(release): preparar pipeline de semantic release
+
+        Tipos: feat, fix, docs, style, refactor, perf, test, build, ci, chore, revert, security
+        Scopes: ui, pages, components, styles, assets, api, auth, seo, content, config, build, ci, release, deps, repo
+
+pre-commit:
+  commands:
+    bun-runtime-check:
+      run: bun --version
+      tags: tooling
