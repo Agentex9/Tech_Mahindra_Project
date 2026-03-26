@@ -29,17 +29,17 @@ const config = {
         preset: 'angular',
         presetConfig: {
           types: [
-            { type: 'feat', section: 'Nuevas Caracteristicas', hidden: false },
-            { type: 'fix', section: 'Correcciones', hidden: false },
-            { type: 'perf', section: 'Rendimiento', hidden: false },
-            { type: 'security', section: 'Seguridad', hidden: false },
-            { type: 'refactor', section: 'Refactor', hidden: false },
-            { type: 'build', section: 'Build y Entrega', hidden: false },
-            { type: 'ci', section: 'CI/CD', hidden: false },
-            { type: 'revert', section: 'Reversiones', hidden: false },
-            { type: 'docs', section: 'Documentacion', hidden: false },
-            { type: 'style', section: 'Estilos', hidden: false },
-            { type: 'chore', section: 'Mantenimiento', hidden: false },
+            { type: 'feat', section: '✨ Nuevas Caracteristicas', hidden: false },
+            { type: 'fix', section: '🐛 Correcciones', hidden: false },
+            { type: 'perf', section: '⚡ Rendimiento', hidden: false },
+            { type: 'security', section: '🔒 Seguridad', hidden: false },
+            { type: 'refactor', section: '♻️ Refactor', hidden: false },
+            { type: 'build', section: '🏗️ Build y Entrega', hidden: false },
+            { type: 'ci', section: '🤖 CI/CD', hidden: false },
+            { type: 'revert', section: '⏪ Reversiones', hidden: false },
+            { type: 'docs', section: '📝 Documentacion', hidden: false },
+            { type: 'style', section: '🎨 Estilos', hidden: false },
+            { type: 'chore', section: '🧰 Mantenimiento', hidden: false },
             { type: 'test', section: 'Testing', hidden: true }
           ]
         },
@@ -77,9 +77,9 @@ const config = {
       '@semantic-release/changelog',
       {
         changelogFile: 'CHANGELOG.md',
-        changelogTitle: `# Changelog - Tech Mahindra Project
+        changelogTitle: `# 📘 Changelog - Tech Mahindra Project
 
-Todos los cambios relevantes del proyecto se documentan aqui siguiendo Semantic Versioning.
+Cambios relevantes del proyecto siguiendo Semantic Versioning.
 `
       }
     ],
