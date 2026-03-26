@@ -102,7 +102,7 @@ class Sprints(AuditModel):
 
 ## Issues Related Models
 
-class Issue(AuditModel):
+class Issues(AuditModel):
     assignment_type_choices = [
         ('Manual', 'Manual'),
         ('Bidding', 'Bidding'),
@@ -148,7 +148,7 @@ class Label(AuditModel):
     
 class IssueComments(AuditModel):
     comment_id = models.UUIDField(primary_key=True, default=uuid4, editable=False)
-    issue = models.ForeignKey(Issue, on_delete=models.CASCADE, related_name='comments')
+    issue = models.ForeignKey(Issues, on_delete=models.CASCADE, related_name='comments')
     multimedia_attachments = models.FileField(upload_to='comment_multimedia/', blank=True, null=True)
     comment_text = models.TextField()
     
@@ -164,7 +164,7 @@ class IssueAuctions(AuditModel):
         ('Cancelled', 'Cancelled'),
     ]
     auction_id = models.UUIDField(primary_key=True, default=uuid4, editable=False)
-    issue = models.ForeignKey(Issue, on_delete=models.CASCADE, related_name='auctions')
+    issue = models.ForeignKey(Issues, on_delete=models.CASCADE, related_name='auctions')
     start_date = models.DateTimeField()
     end_date = models.DateTimeField()
     status = models.CharField(max_length=255, choices=action_status_choices, default='Not Started')
