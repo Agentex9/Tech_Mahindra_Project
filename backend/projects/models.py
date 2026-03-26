@@ -89,6 +89,7 @@ class Sprints(AuditModel):
     start_date = models.DateField()
     end_date = models.DateField()
     status = models.CharField(max_length=255, choices=project.status_choices, default='Not Started')
+    goals = models.TextField(blank=True, null=True)
 
     def save(self, *args, **kwargs):
         if self.start_date and self.end_date:
