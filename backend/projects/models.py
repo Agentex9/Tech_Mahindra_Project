@@ -91,7 +91,7 @@ class Sprints(AuditModel):
     status = models.CharField(max_length=255, choices=project.status_choices, default='Not Started')
     goals = models.TextField(blank=True, null=True)
 
-    def save(self, *args, **kwargs):
+    def clean(self, *args, **kwargs):
         if self.start_date and self.end_date:
             if self.end_date < self.start_date:
                 raise ValueError("Sprint end date cannot be before sprint start date.")
@@ -173,7 +173,7 @@ class IssueAuctions(AuditModel):
     ## TODO: Update later once users exists
     winner = models.CharField(max_length=255, blank=True, null=True)
 
-    def save(self, *args, **kwargs):
+    def clean(self, *args, **kwargs):
         if self.start_date and self.end_date:
             if self.end_date < self.start_date:
                 raise ValueError("Auction end date cannot be before auction start date.")
