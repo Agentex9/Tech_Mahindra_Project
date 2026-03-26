@@ -55,6 +55,8 @@ const config = {
               assets: 'Assets',
               api: 'API',
               auth: 'Autenticacion',
+              docker: 'Docker',
+              db: 'Base de Datos',
               seo: 'SEO',
               content: 'Contenido',
               config: 'Configuracion',

@@ -1,0 +1,16 @@
+services:
+  db:
+    image: postgres:17
+    container_name: worktrack_db
+    restart: unless-stopped
+    environment:
+      POSTGRES_DB: ${DB_NAME:-worktrack_db}
+      POSTGRES_USER: ${DB_USER:-worktrack_user}
+      POSTGRES_PASSWORD: ${DB_PASSWORD:-worktrack_password}
+    ports:
+      - "${DB_PORT:-5432}:5432"
+    volumes:
+      - postgres_data:/var/lib/postgresql/data
+
+volumes:
+  postgres_data:
