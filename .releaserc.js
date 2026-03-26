@@ -45,9 +45,7 @@ const config = {
         },
         writerOpts: {
           transform: (commit) => {
-            if (!commit.scope) {
-              commit.scope = 'repo';
-            }
+            const scope = commit.scope || 'repo';
 
             const scopeMap = {
               ui: 'Interfaz',
@@ -67,8 +65,10 @@ const config = {
               repo: 'General'
             };
 
-            commit.scope = scopeMap[commit.scope] || commit.scope;
-            return commit;
+            return {
+              ...commit,
+              scope: scopeMap[scope] || scope
+            };
           }
         }
       }
