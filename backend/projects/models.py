@@ -2,7 +2,7 @@ from uuid import uuid4
 
 from django.db import models
 
-class audit(models.Model):
+class AuditModel(models.Model):
     created_at = models.DateTimeField(auto_now_add=True)
     updated_at = models.DateTimeField(auto_now=True)
     ## Update later once users exists
@@ -15,15 +15,16 @@ class audit(models.Model):
 
 ## Project related Models
 
-status_choices = [
-    ('Not Started', 'Not Started'),
-    ('In Progress', 'In Progress'),
-    ('Completed', 'Completed'),
-    ('On Hold', 'On Hold'),
-    ('Cancelled', 'Cancelled'),
-]
 
-class project(audit):
+class Projects(AuditModel):
+    status_choices = [
+        ('Not Started', 'Not Started'),
+        ('In Progress', 'In Progress'),
+        ('Completed', 'Completed'),
+        ('On Hold', 'On Hold'),
+        ('Cancelled', 'Cancelled'),
+    ]
+    
     project_id = models.UUIDField(primary_key=True, default=uuid4, editable=False)
     name = models.CharField(max_length=255)
     description = models.TextField(blank=True, null=True)
@@ -37,9 +38,9 @@ class project(audit):
     def __str__(self):
         return self.name
     
-class project_planning(audit):
+class ProjectPlannings(AuditModel):
     planning_id = models.UUIDField(primary_key=True, default=uuid4, editable=False)
-    project = models.ForeignKey(project, on_delete=models.CASCADE, related_name='plannings')
+    project = models.ForeignKey(Projects, on_delete=models.CASCADE, related_name='plannings')
     planned_start_date = models.DateField()
     planned_end_date = models.DateField()
     estimated_duration = models.IntegerField(help_text="Estimated duration in days")
@@ -57,9 +58,9 @@ class project_planning(audit):
     def __str__(self):
         return f"Planning for {self.project.name}"
     
-class project_financials(audit):
+class ProjectFinancials(AuditModel):
     financial_id = models.UUIDField(primary_key=True, default=uuid4, editable=False)
-    project = models.ForeignKey(project, on_delete=models.CASCADE, related_name='financials')
+    project = models.ForeignKey(Projects, on_delete=models.CASCADE, related_name='financials')
     estimated_budget = models.DecimalField(max_digits=12, decimal_places=2)
     estimated_monthly_cost = models.DecimalField(max_digits=12, decimal_places=2)
     billing_model = models.CharField(max_length=255, blank=True, null=True)
@@ -67,11 +68,11 @@ class project_financials(audit):
     def __str__(self):
         return f"Financials for {self.project.name}"
 
-class project_risk(audit):
+class ProjectRisks(AuditModel):
     risk_id = models.UUIDField(primary_key=True, default=uuid4, editable=False)
     risk_name = models.CharField(max_length=255)
     risk_description = models.TextField(blank=True, null=True)
-    project = models.ForeignKey(project, on_delete=models.CASCADE, related_name='risks')
+    project = models.ForeignKey(Projects, on_delete=models.CASCADE, related_name='risks')
     deviation_tolerance_percentage = models.DecimalField(max_digits=5, decimal_places=2, help_text="Acceptable deviation percentage")
     delay_weight = models.DecimalField(max_digits=5, decimal_places=2, help_text="Weight for schedule delays")
     budget_weight = models.DecimalField(max_digits=5, decimal_places=2, help_text="Weight for budget overruns")
@@ -81,13 +82,13 @@ class project_risk(audit):
     def __str__(self):
         return f"Risk for {self.project.name}"
 
-class sprint(audit):
+class Sprints(AuditModel):
     sprint_id = models.UUIDField(primary_key=True, default=uuid4, editable=False)
-    project = models.ForeignKey(project, on_delete=models.CASCADE, related_name='sprints')
+    project = models.ForeignKey(Projects, on_delete=models.CASCADE, related_name='sprints')
     name = models.CharField(max_length=255)
     start_date = models.DateField()
     end_date = models.DateField()
-    status = models.CharField(max_length=255, choices=status_choices, default='Not Started')
+    status = models.CharField(max_length=255, choices=project.status_choices, default='Not Started')
 
     def save(self, *args, **kwargs):
         if self.start_date and self.end_date:
@@ -101,14 +102,14 @@ class sprint(audit):
 
 ## Issues Related Models
 
-assignment_type_choices = [
-    ('Manual', 'Manual'),
-    ('Bidding', 'Bidding'),
-]
-
-class issue(audit):
+class Issue(AuditModel):
+    assignment_type_choices = [
+        ('Manual', 'Manual'),
+        ('Bidding', 'Bidding'),
+    ]
+    
     issue_id = models.UUIDField(primary_key=True, default=uuid4, editable=False)
-    project = models.ForeignKey(project, on_delete=models.CASCADE, related_name='issues')
+    project = models.ForeignKey(Projects, on_delete=models.CASCADE, related_name='issues')
     title = models.CharField(max_length=255)
     description = models.TextField(blank=True, null=True)
     multimedia_attachments = models.FileField(upload_to='multimedia/', blank=True, null=True)
@@ -118,7 +119,7 @@ class issue(audit):
     price_points = models.DecimalField(max_digits=10, decimal_places=2, blank=True, null=True)
     assignment_type = models.CharField(max_length=255, blank=True, null=True)
     priority = models.CharField(max_length=255, blank=True, null=True)
-    status = models.CharField(max_length=255, choices=status_choices, default='Not Started')
+    status = models.CharField(max_length=255, choices=project.status_choices, default='Not Started')
     
     ## Update later once users exists
     informed_by = models.CharField(max_length=255)
@@ -137,18 +138,17 @@ class issue(audit):
     def __str__(self):
         return f"Issue {self.title} for {self.project.name}"
     
-class label(audit):
+class Label(AuditModel):
     label_id = models.UUIDField(primary_key=True, default=uuid4, editable=False)
     name = models.CharField(max_length=255)
     color = models.CharField(max_length=7, blank=True, null=True)  # Hex color code
-    project = models.ForeignKey(project, on_delete=models.CASCADE, related_name='labels')
-
+    project = models.ForeignKey(Projects, on_delete=models.CASCADE, related_name='labels')
     def __str__(self):
         return f"Label {self.name} for {self.project.name}"
     
-class issue_comment(audit):
+class IssueComments(AuditModel):
     comment_id = models.UUIDField(primary_key=True, default=uuid4, editable=False)
-    issue = models.ForeignKey(issue, on_delete=models.CASCADE, related_name='comments')
+    issue = models.ForeignKey(Issue, on_delete=models.CASCADE, related_name='comments')
     multimedia_attachments = models.FileField(upload_to='comment_multimedia/', blank=True, null=True)
     comment_text = models.TextField()
     
@@ -156,7 +156,7 @@ class issue_comment(audit):
     def __str__(self):
         return f"Comment by {self.created_by} on Issue {self.issue.title}"
 
-class issue_auction(audit):
+class IssueAuctions(AuditModel):
     action_status_choices = [
         ('Not Started', 'Not Started'),
         ('In Progress', 'In Progress'),
@@ -164,7 +164,7 @@ class issue_auction(audit):
         ('Cancelled', 'Cancelled'),
     ]
     auction_id = models.UUIDField(primary_key=True, default=uuid4, editable=False)
-    issue = models.ForeignKey(issue, on_delete=models.CASCADE, related_name='auctions')
+    issue = models.ForeignKey(Issue, on_delete=models.CASCADE, related_name='auctions')
     start_date = models.DateTimeField()
     end_date = models.DateTimeField()
     status = models.CharField(max_length=255, choices=action_status_choices, default='Not Started')
@@ -181,9 +181,9 @@ class issue_auction(audit):
     def __str__(self):
         return f"Auction for Issue {self.issue.title} winner: {self.winner}"
 
-class issue_bid(audit):
+class IssueBids(AuditModel):
     bid_id = models.UUIDField(primary_key=True, default=uuid4, editable=False)
-    auction = models.ForeignKey(issue_auction, on_delete=models.CASCADE, related_name='bids')
+    auction = models.ForeignKey(IssueAuctions, on_delete=models.CASCADE, related_name='bids')
     bidder = models.CharField(max_length=255)  # Update later once users exists
     bid_amount = models.DecimalField(max_digits=10, decimal_places=2)
     bid_time = models.DateTimeField(auto_now_add=True)
