@@ -187,7 +187,6 @@ class IssueBids(AuditModel):
     auction = models.ForeignKey(IssueAuctions, on_delete=models.CASCADE, related_name='bids')
     bidder = models.CharField(max_length=255)  # TODO: Update later once users exists
     bid_amount = models.DecimalField(max_digits=10, decimal_places=2)
-    bid_time = models.DateTimeField(auto_now_add=True)
 
     def __str__(self):
         return f"Bid by {self.bidder} for Auction {self.auction.auction_id}"
