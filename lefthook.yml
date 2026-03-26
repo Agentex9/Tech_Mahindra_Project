@@ -12,10 +12,11 @@ commit-msg:
         Ejemplos:
         - feat(ui): mejorar navbar responsive
         - fix(api): corregir error en endpoint de contacto
+        - feat(docker): agregar compose de base de datos
         - chore(release): preparar pipeline de semantic release
 
         Tipos: feat, fix, docs, style, refactor, perf, test, build, ci, chore, revert, security
-        Scopes: ui, pages, components, styles, assets, api, auth, seo, content, config, build, ci, release, deps, repo
+        Scopes: ui, pages, components, styles, assets, api, auth, docker, db, seo, content, config, build, ci, release, deps, repo
 
 pre-commit:
   commands:

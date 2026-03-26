@@ -23,6 +23,8 @@ export default {
       'assets',
       'api',
       'auth',
+      'docker',
+      'db',
       'seo',
       'content',
       'config',
