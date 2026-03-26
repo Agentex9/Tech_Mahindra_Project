@@ -5,7 +5,7 @@ from django.db import models
 class AuditModel(models.Model):
     created_at = models.DateTimeField(auto_now_add=True)
     updated_at = models.DateTimeField(auto_now=True)
-    ## Update later once users exists
+    ## TODO: Update later once users exists
     created_by = models.CharField(max_length=255, blank=True, null=True)
     updated_by = models.CharField(max_length=255, blank=True, null=True)
 
@@ -32,7 +32,7 @@ class Projects(AuditModel):
     project_type = models.CharField(max_length=255, blank=True, null=True)
     status = models.CharField(max_length=255, choices=status_choices, default='Not Started')
 
-    ## Update later once users exists
+    ## TODO: Update later once users exists
     project_manager = models.CharField(max_length=255, blank=True, null=True)
 
     def __str__(self):
@@ -121,7 +121,7 @@ class Issue(AuditModel):
     priority = models.CharField(max_length=255, blank=True, null=True)
     status = models.CharField(max_length=255, choices=project.status_choices, default='Not Started')
     
-    ## Update later once users exists
+    ## TODO: Update later once users exists
     informed_by = models.CharField(max_length=255)
     assigned_to = models.CharField(max_length=255, blank=True, null=True)
 
@@ -169,7 +169,7 @@ class IssueAuctions(AuditModel):
     end_date = models.DateTimeField()
     status = models.CharField(max_length=255, choices=action_status_choices, default='Not Started')
 
-    ## Update later once users exists
+    ## TODO: Update later once users exists
     winner = models.CharField(max_length=255, blank=True, null=True)
 
     def save(self, *args, **kwargs):
@@ -184,7 +184,7 @@ class IssueAuctions(AuditModel):
 class IssueBids(AuditModel):
     bid_id = models.UUIDField(primary_key=True, default=uuid4, editable=False)
     auction = models.ForeignKey(IssueAuctions, on_delete=models.CASCADE, related_name='bids')
-    bidder = models.CharField(max_length=255)  # Update later once users exists
+    bidder = models.CharField(max_length=255)  # TODO: Update later once users exists
     bid_amount = models.DecimalField(max_digits=10, decimal_places=2)
     bid_time = models.DateTimeField(auto_now_add=True)
 
