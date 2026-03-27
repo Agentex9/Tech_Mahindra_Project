@@ -2,6 +2,8 @@ from uuid import uuid4
 
 from django.db import models
 
+from backend.worktrack.settings import STATIC_URL
+
 class AuditModel(models.Model):
     created_at = models.DateTimeField(auto_now_add=True)
     updated_at = models.DateTimeField(auto_now=True)
@@ -113,7 +115,7 @@ class Issues(AuditModel):
     project = models.ForeignKey(Projects, on_delete=models.CASCADE, related_name='issues')
     title = models.CharField(max_length=255)
     description = models.TextField(blank=True, null=True)
-    multimedia_attachments = models.FileField(upload_to='multimedia/', blank=True, null=True)
+    multimedia_attachments = models.FileField(upload_to= STATIC_URL, blank=True, null=True)
     issue_type = models.CharField(max_length=255, blank=True, null=True)
     story_points = models.IntegerField(blank=True, null=True)
     reward_points = models.IntegerField(blank=True, null=True)
@@ -150,7 +152,7 @@ class Label(AuditModel):
 class IssueComments(AuditModel):
     comment_id = models.UUIDField(primary_key=True, default=uuid4, editable=False)
     issue = models.ForeignKey(Issues, on_delete=models.CASCADE, related_name='comments')
-    multimedia_attachments = models.FileField(upload_to='comment_multimedia/', blank=True, null=True)
+    multimedia_attachments = models.FileField(upload_to= STATIC_URL, blank=True, null=True)
     comment_text = models.TextField()
     
 
