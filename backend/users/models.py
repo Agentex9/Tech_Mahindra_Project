@@ -16,7 +16,7 @@ class User(models.Model):
 
 class PointTransaction(models.Model):
     transaction_id = models.AutoField(primary_key=True)
-    user = models.ForeignKey(User, on_delete=models.CASCADE)
+    user = models.ForeignKey(User, on_delete=models.NULL)
     points = models.IntegerField()
     type = models.CharField(max_length=50)
     issue_id = models.IntegerField(null=True, blank=True)
@@ -28,7 +28,7 @@ class PointTransaction(models.Model):
 
 class RouletteSpin(models.Model):
     spin_id = models.AutoField(primary_key=True)
-    user = models.ForeignKey(User, on_delete=models.CASCADE)
+    user = models.ForeignKey(User, on_delete=models.NULL)
     points_won = models.IntegerField()
     spin_cost = models.IntegerField()
     created_at = models.DateTimeField(auto_now_add=True)
