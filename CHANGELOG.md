@@ -1,3 +1,37 @@
+# 📘 Changelog - Tech Mahindra Project
+
+Cambios relevantes del proyecto siguiendo Semantic Versioning.
+
+
+## [1.0.1](https://github.com/Agentex9/Tech_Mahindra_Project/compare/v1.0.0...v1.0.1) (2026-04-07)
+
+
+* **General:** Merge pull request #33 from Agentex9/dev ([](https://github.com/Agentex9/Tech_Mahindra_Project/commit/f4baa3ebb87bd1fedc78f77b9c113b93731878b1)), closes [#33](https://github.com/Agentex9/Tech_Mahindra_Project/issues/33)
+* **General:** Merge pull request #34 from Agentex9/dev ([](https://github.com/Agentex9/Tech_Mahindra_Project/commit/36cf74c96438bed278b3bfde74b088fb99ad131f)), closes [#34](https://github.com/Agentex9/Tech_Mahindra_Project/issues/34)
+
+
+### chore
+
+* **Base de Datos:** creation of models for all related subjects to projects and issues ([](https://github.com/Agentex9/Tech_Mahindra_Project/commit/b7782c5bea38230556907db9f2e3bde8ac117a3a))
+* **Docker:** add postgresql db on docker ([](https://github.com/Agentex9/Tech_Mahindra_Project/commit/f5384756cb57d736373736fed985b619f71a2695))
+
+
+### fix
+
+* **Base de Datos:** added goals to sprints table ([](https://github.com/Agentex9/Tech_Mahindra_Project/commit/57f30e291bd64f231cf50d8f42cceb08fe685c2a))
+* **Base de Datos:** changed functions from save to clean ([](https://github.com/Agentex9/Tech_Mahindra_Project/commit/e47964d801a50a23eda70e9c5df98fd3fc0b4995))
+* **Base de Datos:** changed issues table name to match naming convension ([](https://github.com/Agentex9/Tech_Mahindra_Project/commit/f5b436389d47fe8c54081e1052c772aceeaeef39))
+* **Base de Datos:** changed to correct naming convension and moved choices ([](https://github.com/Agentex9/Tech_Mahindra_Project/commit/eea02c38922e983c47d7c1e3edc947efa7761860))
+* **Base de Datos:** comment fix ([](https://github.com/Agentex9/Tech_Mahindra_Project/commit/55c73f209fef1bc5a65bc141606630725b32e00b))
+* **Base de Datos:** deleted redundant field bid date ([](https://github.com/Agentex9/Tech_Mahindra_Project/commit/9f517cc163eb910b49bbe21124248e92e7d78b75))
+* **Base de Datos:** update paths for static files to use saved ([](https://github.com/Agentex9/Tech_Mahindra_Project/commit/16f611577c7e0ddc495294eed5e5fc9421d56696))
+* **Configuracion:** added projects app to the settings file ([](https://github.com/Agentex9/Tech_Mahindra_Project/commit/36a9c4669d2d98f4732c43e5db0dd5f3edfa1d85))
+
+
+### style
+
+* **Release:** modify changelog desing ([](https://github.com/Agentex9/Tech_Mahindra_Project/commit/51a9600cac9c6a7bc6d2fc2415d13d03f105aabd))
+
 # Changelog - Tech Mahindra Project
 
 Todos los cambios relevantes del proyecto se documentan aqui siguiendo Semantic Versioning.
