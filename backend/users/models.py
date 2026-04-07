@@ -1,37 +1,33 @@
 from django.db import models
+from projects.models import AuditModel
+from django.contrib.auth.models import AbstractUser
+from uuid import uuid4
 
 
-class User(models.Model):
-    user_id = models.AutoField(primary_key=True)
-    username = models.CharField(max_length=150)
-    email = models.EmailField()
+class User(AuditModel, AbstractUser):
     role = models.CharField(max_length=50)
     points_balance = models.IntegerField()
-    is_active = models.BooleanField(default=True)
-    created_at = models.DateTimeField(auto_now_add=True)
 
     def __str__(self):
         return self.username
 
 
-class PointTransaction(models.Model):
-    transaction_id = models.AutoField(primary_key=True)
-    user = models.ForeignKey(User, on_delete=models.NULL)
+class PointTransaction(AuditModel):
+    transaction_id = models.UUIDField(primary_key=True, default=uuid4, editable=False)
+    user = models.ForeignKey(User, on_delete=models.SET_NULL, null=True, related_name='transactions')
     points = models.IntegerField()
     type = models.CharField(max_length=50)
     issue_id = models.IntegerField(null=True, blank=True)
-    created_at = models.DateTimeField(auto_now_add=True)
 
     def __str__(self):
         return f"{self.user_id} - {self.points}"
 
 
-class RouletteSpin(models.Model):
-    spin_id = models.AutoField(primary_key=True)
-    user = models.ForeignKey(User, on_delete=models.NULL)
+class RouletteSpin(AuditModel):
+    spin_id = models.UUIDField(primary_key=True, default=uuid4, editable=False)
+    user = models.ForeignKey(User, on_delete=models.SET_NULL, null=True, related_name='spins')
     points_won = models.IntegerField()
     spin_cost = models.IntegerField()
-    created_at = models.DateTimeField(auto_now_add=True)
 
     def __str__(self):
         return f"{self.user_id} - {self.points_won}"
