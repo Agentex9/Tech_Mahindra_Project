@@ -17,7 +17,7 @@ class PointTransaction(AuditModel):
     user = models.ForeignKey(User, on_delete=models.SET_NULL, null=True, related_name='transactions')
     points = models.IntegerField()
     type = models.CharField(max_length=50)
-    issue_id = models.IntegerField(null=True, blank=True)
+    issue_id = models.ForeignKey('projects.Issues', on_delete=models.SET_NULL, null=True, related_name='point_transactions')
 
     def __str__(self):
         return f"{self.user_id} - {self.points}"
