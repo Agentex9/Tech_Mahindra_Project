@@ -3,6 +3,23 @@
 Cambios relevantes del proyecto siguiendo Semantic Versioning.
 
 
+## [1.0.2](https://github.com/Agentex9/Tech_Mahindra_Project/compare/v1.0.1...v1.0.2) (2026-04-08)
+
+
+* **General:** Merge pull request #35 from Agentex9/dev ([](https://github.com/Agentex9/Tech_Mahindra_Project/commit/4c153e2f1d74e814db43bedaf693375e84a4cc69)), closes [#35](https://github.com/Agentex9/Tech_Mahindra_Project/issues/35)
+
+
+### chore
+
+* **Base de Datos:** creation of models for all related subjects to users and transactions ([](https://github.com/Agentex9/Tech_Mahindra_Project/commit/81797e86025dfa588ff245fcf28ff62f91596ebe))
+
+
+### fix
+
+* **Base de Datos:** change casacade to null ([](https://github.com/Agentex9/Tech_Mahindra_Project/commit/530a2d54948db15540416361e23f113a49b80bb1))
+* **Base de Datos:** fix field in transactions to use fk (issue_id) ([](https://github.com/Agentex9/Tech_Mahindra_Project/commit/82a041fd7a592d5d59629e3c459cbe1b52921534))
+* **Base de Datos:** update project models, use abstractuser, switch pk to uuid, fix fks ([](https://github.com/Agentex9/Tech_Mahindra_Project/commit/29326870eb32fb5030dfe995e9bfa539e6302bda))
+
 ## [1.0.1](https://github.com/Agentex9/Tech_Mahindra_Project/compare/v1.0.0...v1.0.1) (2026-04-07)
 
 
