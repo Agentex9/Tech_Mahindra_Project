@@ -1,17 +1,20 @@
 from uuid import uuid4
 
+from django.conf import settings
 from django.db import models
 
-from backend.worktrack.settings import STATIC_URL
-from users.models import User
 
 class AuditModel(models.Model):
     created_at = models.DateTimeField(auto_now_add=True)
     updated_at = models.DateTimeField(auto_now=True)
-    created_by = models.ForeignKey(User, on_delete=models.SET_NULL, null=True, related_name='created_%(class)s')
-    updated_by = models.ForeignKey(User, on_delete=models.SET_NULL, null=True, related_name='updated_%(class)s')
+    created_by = models.ForeignKey(
+        settings.AUTH_USER_MODEL, on_delete=models.SET_NULL, null=True, related_name='created_%(class)s'
+    )
+    updated_by = models.ForeignKey(
+        settings.AUTH_USER_MODEL, on_delete=models.SET_NULL, null=True, related_name='updated_%(class)s'
+    )
 
-    def meta(self):
+    class Meta:
         abstract = True
 
 
@@ -34,7 +37,9 @@ class Projects(AuditModel):
     project_type = models.CharField(max_length=255, blank=True, null=True)
     status = models.CharField(max_length=255, choices=status_choices, default='Not Started')
 
-    project_manager = models.ForeignKey(User, on_delete=models.SET_NULL, null=True, related_name='managed_projects')
+    project_manager = models.ForeignKey(
+        settings.AUTH_USER_MODEL, on_delete=models.SET_NULL, null=True, related_name='managed_projects'
+    )
 
     def __str__(self):
         return self.name
@@ -89,14 +94,14 @@ class Sprints(AuditModel):
     name = models.CharField(max_length=255)
     start_date = models.DateField()
     end_date = models.DateField()
-    status = models.CharField(max_length=255, choices=project.status_choices, default='Not Started')
+    status = models.CharField(max_length=255, choices=Projects.status_choices, default='Not Started')
     goals = models.TextField(blank=True, null=True)
 
     def clean(self, *args, **kwargs):
         if self.start_date and self.end_date:
             if self.end_date < self.start_date:
                 raise ValueError("Sprint end date cannot be before sprint start date.")
-        super().save(*args, **kwargs)
+        super().clean(*args, **kwargs)
 
     def __str__(self):
         return f"Sprint {self.name} for {self.project.name}"
@@ -114,17 +119,21 @@ class Issues(AuditModel):
     project = models.ForeignKey(Projects, on_delete=models.CASCADE, related_name='issues')
     title = models.CharField(max_length=255)
     description = models.TextField(blank=True, null=True)
-    multimedia_attachments = models.FileField(upload_to= STATIC_URL, blank=True, null=True)
+    multimedia_attachments = models.FileField(upload_to='issue_attachments/', blank=True, null=True)
     issue_type = models.CharField(max_length=255, blank=True, null=True)
     story_points = models.IntegerField(blank=True, null=True)
     reward_points = models.IntegerField(blank=True, null=True)
     price_points = models.DecimalField(max_digits=10, decimal_places=2, blank=True, null=True)
     assignment_type = models.CharField(max_length=255, blank=True, null=True)
     priority = models.CharField(max_length=255, blank=True, null=True)
-    status = models.CharField(max_length=255, choices=project.status_choices, default='Not Started')
-    
-    informed_by = models.ForeignKey(User, on_delete=models.SET_NULL, null=True, related_name='informed_issues')
-    assigned_to = models.ForeignKey(User, on_delete=models.SET_NULL, null=True, related_name='assigned_issues')
+    status = models.CharField(max_length=255, choices=Projects.status_choices, default='Not Started')
+
+    informed_by = models.ForeignKey(
+        settings.AUTH_USER_MODEL, on_delete=models.SET_NULL, null=True, related_name='informed_issues'
+    )
+    assigned_to = models.ForeignKey(
+        settings.AUTH_USER_MODEL, on_delete=models.SET_NULL, null=True, related_name='assigned_issues'
+    )
 
     due_date = models.DateField(blank=True, null=True)
     labels = models.ManyToManyField('label', blank=True, related_name='issues')
@@ -150,7 +159,7 @@ class Label(AuditModel):
 class IssueComments(AuditModel):
     comment_id = models.UUIDField(primary_key=True, default=uuid4, editable=False)
     issue = models.ForeignKey(Issues, on_delete=models.CASCADE, related_name='comments')
-    multimedia_attachments = models.FileField(upload_to= STATIC_URL, blank=True, null=True)
+    multimedia_attachments = models.FileField(upload_to='comment_attachments/', blank=True, null=True)
     comment_text = models.TextField()
     
 
@@ -170,7 +179,9 @@ class IssueAuctions(AuditModel):
     end_date = models.DateTimeField()
     status = models.CharField(max_length=255, choices=action_status_choices, default='Not Started')
 
-    winner = models.ForeignKey(User, on_delete=models.SET_NULL, null=True, related_name='won_auctions')
+    winner = models.ForeignKey(
+        settings.AUTH_USER_MODEL, on_delete=models.SET_NULL, null=True, related_name='won_auctions'
+    )
 
     def clean(self, *args, **kwargs):
         if self.start_date and self.end_date:
@@ -184,7 +195,9 @@ class IssueAuctions(AuditModel):
 class IssueBids(AuditModel):
     bid_id = models.UUIDField(primary_key=True, default=uuid4, editable=False)
     auction = models.ForeignKey(IssueAuctions, on_delete=models.CASCADE, related_name='bids')
-    bidder = models.ForeignKey(User, on_delete=models.SET_NULL, null=True, related_name='bids')
+    bidder = models.ForeignKey(
+        settings.AUTH_USER_MODEL, on_delete=models.SET_NULL, null=True, related_name='bids'
+    )
     bid_amount = models.DecimalField(max_digits=10, decimal_places=2)
 
     def __str__(self):
