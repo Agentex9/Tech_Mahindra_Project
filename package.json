@@ -1,6 +1,6 @@
 {
   "name": "tech-mahindra-project",
-  "version": "1.0.2",
+  "version": "1.0.3",
   "private": true,
   "type": "module",
   "description": "Release tooling with semantic-release and lefthook",

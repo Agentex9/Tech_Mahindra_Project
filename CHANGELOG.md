@@ -3,6 +3,16 @@
 Cambios relevantes del proyecto siguiendo Semantic Versioning.
 
 
+## [1.0.3](https://github.com/Agentex9/Tech_Mahindra_Project/compare/v1.0.2...v1.0.3) (2026-04-08)
+
+
+* **General:** Merge pull request #36 from Agentex9/2-login ([](https://github.com/Agentex9/Tech_Mahindra_Project/commit/4eb0ce887b1bf863078afd6ffef23de5aef74da4)), closes [#36](https://github.com/Agentex9/Tech_Mahindra_Project/issues/36)
+
+
+### security
+
+* **Autenticacion:** add django-knox token auth system ([](https://github.com/Agentex9/Tech_Mahindra_Project/commit/17bfabf064c757dd8b829d5c0d85caa239eade07))
+
 ## [1.0.2](https://github.com/Agentex9/Tech_Mahindra_Project/compare/v1.0.1...v1.0.2) (2026-04-08)
 
 
