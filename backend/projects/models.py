@@ -3,13 +3,13 @@ from uuid import uuid4
 from django.db import models
 
 from backend.worktrack.settings import STATIC_URL
+from users.models import User
 
 class AuditModel(models.Model):
     created_at = models.DateTimeField(auto_now_add=True)
     updated_at = models.DateTimeField(auto_now=True)
-    ## TODO: Update later once users exists
-    created_by = models.CharField(max_length=255, blank=True, null=True)
-    updated_by = models.CharField(max_length=255, blank=True, null=True)
+    created_by = models.ForeignKey(User, on_delete=models.SET_NULL, null=True, related_name='created_%(class)s')
+    updated_by = models.ForeignKey(User, on_delete=models.SET_NULL, null=True, related_name='updated_%(class)s')
 
     def meta(self):
         abstract = True
@@ -34,8 +34,7 @@ class Projects(AuditModel):
     project_type = models.CharField(max_length=255, blank=True, null=True)
     status = models.CharField(max_length=255, choices=status_choices, default='Not Started')
 
-    ## TODO: Update later once users exists
-    project_manager = models.CharField(max_length=255, blank=True, null=True)
+    project_manager = models.ForeignKey(User, on_delete=models.SET_NULL, null=True, related_name='managed_projects')
 
     def __str__(self):
         return self.name
@@ -124,9 +123,8 @@ class Issues(AuditModel):
     priority = models.CharField(max_length=255, blank=True, null=True)
     status = models.CharField(max_length=255, choices=project.status_choices, default='Not Started')
     
-    ## TODO: Update later once users exists
-    informed_by = models.CharField(max_length=255)
-    assigned_to = models.CharField(max_length=255, blank=True, null=True)
+    informed_by = models.ForeignKey(User, on_delete=models.SET_NULL, null=True, related_name='informed_issues')
+    assigned_to = models.ForeignKey(User, on_delete=models.SET_NULL, null=True, related_name='assigned_issues')
 
     due_date = models.DateField(blank=True, null=True)
     labels = models.ManyToManyField('label', blank=True, related_name='issues')
@@ -172,8 +170,7 @@ class IssueAuctions(AuditModel):
     end_date = models.DateTimeField()
     status = models.CharField(max_length=255, choices=action_status_choices, default='Not Started')
 
-    ## TODO: Update later once users exists
-    winner = models.CharField(max_length=255, blank=True, null=True)
+    winner = models.ForeignKey(User, on_delete=models.SET_NULL, null=True, related_name='won_auctions')
 
     def clean(self, *args, **kwargs):
         if self.start_date and self.end_date:
@@ -187,7 +184,7 @@ class IssueAuctions(AuditModel):
 class IssueBids(AuditModel):
     bid_id = models.UUIDField(primary_key=True, default=uuid4, editable=False)
     auction = models.ForeignKey(IssueAuctions, on_delete=models.CASCADE, related_name='bids')
-    bidder = models.CharField(max_length=255)  # TODO: Update later once users exists
+    bidder = models.ForeignKey(User, on_delete=models.SET_NULL, null=True, related_name='bids')
     bid_amount = models.DecimalField(max_digits=10, decimal_places=2)
 
     def __str__(self):
