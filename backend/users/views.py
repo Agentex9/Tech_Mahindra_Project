@@ -37,15 +37,15 @@ class AuthViewSet(viewsets.ViewSet):
         serializer.is_valid(raise_exception=True)
         user = serializer.validated_data['user']
 
-        limit = knox_settings.TOKEN_LIMIT_PER_USER
-        if limit is not None:
-            now = timezone.now()
-            active = user.auth_token_set.filter(Q(expiry__gt=now) | Q(expiry__isnull=True))
-            if active.count() >= limit:
-                return Response(
-                    {'error': 'Se alcanzó el máximo de sesiones permitidas para este usuario.'},
-                    status=status.HTTP_403_FORBIDDEN,
-                )
+        limit = 3
+        now = timezone.now()
+        active = user.auth_token_set.filter(Q(expiry__gt=now) | Q(expiry__isnull=True)).order_by('created')
+        while active.count() >= limit:
+            oldest = active.first()
+            if oldest is None:
+                break
+            oldest.delete()
+            active = user.auth_token_set.filter(Q(expiry__gt=now) | Q(expiry__isnull=True)).order_by('created')
 
         instance, token = AuthToken.objects.create(
             user=user,
