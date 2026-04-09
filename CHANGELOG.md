@@ -3,6 +3,17 @@
 Cambios relevantes del proyecto siguiendo Semantic Versioning.
 
 
+## [1.0.4](https://github.com/Agentex9/Tech_Mahindra_Project/compare/v1.0.3...v1.0.4) (2026-04-09)
+
+
+* **General:** Merge pull request #37 from Agentex9/3-gestión-de-sesión ([](https://github.com/Agentex9/Tech_Mahindra_Project/commit/0d683dadf1d111950d21940c5b7c340003a5ea1b)), closes [#37](https://github.com/Agentex9/Tech_Mahindra_Project/issues/37)
+* **General:** Merge pull request #38 from Agentex9/dev ([](https://github.com/Agentex9/Tech_Mahindra_Project/commit/7bc3b366dd1382b252dd177c53b5ff18a61c41ac)), closes [#38](https://github.com/Agentex9/Tech_Mahindra_Project/issues/38)
+
+
+### security
+
+* **Autenticacion:** modify session limits ([](https://github.com/Agentex9/Tech_Mahindra_Project/commit/0fec8c3eb1f63922a534bc991c8556ec5a1736a0))
+
 ## [1.0.3](https://github.com/Agentex9/Tech_Mahindra_Project/compare/v1.0.2...v1.0.3) (2026-04-08)
 
 
