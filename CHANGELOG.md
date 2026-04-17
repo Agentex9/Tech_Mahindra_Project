@@ -3,6 +3,16 @@
 Cambios relevantes del proyecto siguiendo Semantic Versioning.
 
 
+# [1.1.0](https://github.com/Agentex9/Tech_Mahindra_Project/compare/v1.0.4...v1.1.0) (2026-04-17)
+
+
+* **General:** Merge pull request #39 from Agentex9/dev ([](https://github.com/Agentex9/Tech_Mahindra_Project/commit/e5b93e610a7f0cd70e006efc971cc6d64e578327)), closes [#39](https://github.com/Agentex9/Tech_Mahindra_Project/issues/39)
+
+
+### feat
+
+* **Interfaz:** add first frontend mockup ([](https://github.com/Agentex9/Tech_Mahindra_Project/commit/a315c4e5e16d5a7815e8c3a3b7ffee882be7fed3))
+
 ## [1.0.4](https://github.com/Agentex9/Tech_Mahindra_Project/compare/v1.0.3...v1.0.4) (2026-04-09)
 
 
