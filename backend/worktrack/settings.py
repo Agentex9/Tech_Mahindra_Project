@@ -10,6 +10,7 @@ For the full list of settings and their values, see
 https://docs.djangoproject.com/en/6.0/ref/settings/
 """
 
+import importlib.util
 import os
 from datetime import timedelta
 from pathlib import Path
@@ -23,6 +24,15 @@ ROOT_DIR = BASE_DIR.parent
 load_dotenv(ROOT_DIR / '.env')
 
 
+def env_bool(name, default=False):
+    value = os.getenv(name)
+    if value is None:
+        return default
+
+    normalized = value.split('#', 1)[0].strip().lower()
+    return normalized in {'1', 'true', 'yes', 'on'}
+
+
 # Quick-start development settings - unsuitable for production
 # See https://docs.djangoproject.com/en/6.0/howto/deployment/checklist/
 
@@ -30,9 +40,10 @@ load_dotenv(ROOT_DIR / '.env')
 SECRET_KEY = os.getenv('SECRET_KEY', 'django-insecure-m6c^tjnu2iv9of4s(-q#8b_o*6ndvd5!w=cd=4@huspcr@d)#f')
 
 # SECURITY WARNING: don't run with debug turned on in production!
-DEBUG = os.getenv('DEBUG', 'True') == 'True'
+DEBUG = env_bool('DEBUG', default=True)
+DEBUG_TOOLBAR_ENABLED = DEBUG and importlib.util.find_spec('debug_toolbar') is not None
 
-ALLOWED_HOSTS = os.getenv('ALLOWED_HOSTS', '').split(',')
+ALLOWED_HOSTS = [host.strip() for host in os.getenv('ALLOWED_HOSTS', '').split(',') if host.strip()]
 
 
 # Application definition
@@ -45,10 +56,14 @@ INSTALLED_APPS = [
     'django.contrib.messages',
     'django.contrib.staticfiles',
     'rest_framework',
+    'drf_spectacular',
     'knox',
     'users',
     'projects',
 ]
+
+if DEBUG_TOOLBAR_ENABLED:
+    INSTALLED_APPS += ['debug_toolbar']
 
 AUTH_USER_MODEL = 'users.User'
 
@@ -59,11 +74,20 @@ REST_FRAMEWORK = {
     'DEFAULT_PERMISSION_CLASSES': [
         'rest_framework.permissions.IsAuthenticated',
     ],
+    'DEFAULT_SCHEMA_CLASS': 'drf_spectacular.openapi.AutoSchema',
 }
 
 REST_KNOX = {
     'TOKEN_TTL': timedelta(hours=24),
     'USER_SERIALIZER': 'users.serializers.UserSerializer',
+}
+
+SPECTACULAR_SETTINGS = {
+    'TITLE': 'WorkTrack API',
+    'DESCRIPTION': 'Documentacion automatica de la API de WorkTrack.',
+    'VERSION': '1.0.0',
+    'SERVE_INCLUDE_SCHEMA': False,
+    'SCHEMA_PATH_PREFIX': r'/api',
 }
 
 MIDDLEWARE = [
@@ -75,6 +99,9 @@ MIDDLEWARE = [
     'django.contrib.messages.middleware.MessageMiddleware',
     'django.middleware.clickjacking.XFrameOptionsMiddleware',
 ]
+
+if DEBUG_TOOLBAR_ENABLED:
+    MIDDLEWARE.insert(2, 'debug_toolbar.middleware.DebugToolbarMiddleware')
 
 ROOT_URLCONF = 'worktrack.urls'
 
@@ -146,3 +173,9 @@ USE_TZ = True
 # https://docs.djangoproject.com/en/6.0/howto/static-files/
 
 STATIC_URL = os.getenv('STATIC_URL', 'static/')
+
+INTERNAL_IPS = [
+    ip.strip()
+    for ip in os.getenv('INTERNAL_IPS', '127.0.0.1,localhost').split(',')
+    if ip.strip()
+]

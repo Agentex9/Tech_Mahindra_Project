@@ -1,15 +1,29 @@
-from django.db import models
-from projects.models import AuditModel
-from django.contrib.auth.models import AbstractUser
 from uuid import uuid4
+
+from django.contrib.auth.models import AbstractUser
+from django.db import models
+from knox.models import AuthToken
+from projects.models import AuditModel
 
 
 class User(AuditModel, AbstractUser):
     role = models.CharField(max_length=50)
-    points_balance = models.IntegerField()
+    points_balance = models.IntegerField(default=0)
 
     def __str__(self):
         return self.username
+
+
+class AuthSession(models.Model):
+    token = models.OneToOneField(AuthToken, on_delete=models.CASCADE, related_name='session_metadata')
+    user = models.ForeignKey(User, on_delete=models.CASCADE, related_name='auth_sessions')
+    ip_address = models.GenericIPAddressField(blank=True, null=True)
+    user_agent = models.TextField(blank=True)
+    created_at = models.DateTimeField(auto_now_add=True)
+    last_seen_at = models.DateTimeField(auto_now=True)
+
+    def __str__(self):
+        return f"Session for {self.user_id} ({self.ip_address or 'unknown-ip'})"
 
 
 class PointTransaction(AuditModel):

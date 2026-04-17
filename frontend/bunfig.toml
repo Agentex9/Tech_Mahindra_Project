@@ -1,0 +1,5 @@
+[install]
+linker = "hoisted"
+saveTextLockfile = true
+minimumReleaseAge = 259200
+exact = true
