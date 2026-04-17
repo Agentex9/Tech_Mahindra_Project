@@ -32,10 +32,19 @@ class LoginSerializer(serializers.Serializer):
             password=attrs.get('password'),
         )
         if not user:
-            raise serializers.ValidationError(
-                'No se pudo iniciar sesión con las credenciales indicadas.'
-            )
+            raise serializers.ValidationError('No se pudo iniciar sesion con las credenciales indicadas.')
         if not user.is_active:
-            raise serializers.ValidationError('La cuenta de usuario está desactivada.')
+            raise serializers.ValidationError('La cuenta de usuario esta desactivada.')
         attrs['user'] = user
         return attrs
+
+
+class AuthSessionSerializer(serializers.Serializer):
+    id = serializers.IntegerField(source='session_metadata.id')
+    created_at = serializers.DateTimeField()
+    expires_at = serializers.DateTimeField(source='expiry', allow_null=True)
+    ip_address = serializers.IPAddressField(source='session_metadata.ip_address', allow_null=True)
+    is_current = serializers.BooleanField()
+    last_seen_at = serializers.DateTimeField(source='session_metadata.last_seen_at')
+    token_key = serializers.CharField()
+    user_agent = serializers.CharField(source='session_metadata.user_agent')

@@ -76,3 +76,23 @@ bun run commit:check
 ```bash
 bun run hooks:run:pre-commit
 ```
+
+## Docker dev
+
+Levantar base de datos, backend Django y frontend React Router con hot reload:
+
+```bash
+docker compose --env-file docker/.env -f docker/docker-compose.dev.yml up --build
+```
+
+Servicios:
+
+- Frontend: `http://localhost:5173`
+- Backend: `http://localhost:8000`
+- PostgreSQL: `localhost:5432`
+
+Para detenerlos:
+
+```bash
+docker compose --env-file docker/.env -f docker/docker-compose.dev.yml down
+```

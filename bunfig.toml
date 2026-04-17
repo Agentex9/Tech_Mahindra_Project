@@ -1,0 +1,12 @@
+[install]
+# Mantiene el layout clásico de node_modules para maximizar compatibilidad.
+linker = "hoisted"
+
+# Fuerza el lockfile de texto de Bun para poder versionarlo y revisarlo.
+saveTextLockfile = true
+
+# Evita resolver versiones publicadas muy recientemente.
+minimumReleaseAge = 259200
+
+# Usar versión exacta
+exact = true
