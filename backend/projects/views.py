@@ -1,6 +1,6 @@
 
 from rest_framework import viewsets
-from drf_spectacular.utils import extend_schema, OpenApiParameter
+from drf_spectacular.utils import extend_schema
 
 from .models import (
     Projects, ProjectPlannings, ProjectFinancials, ProjectRisks, 
@@ -81,7 +81,7 @@ class SprintViewSet(viewsets.ModelViewSet):
 @extend_schema(tags=["Issues"], summary="Issue CRUD operations", description="Manage issues within projects.")
 class IssueViewSet(viewsets.ModelViewSet):
     queryset = Issues.objects.all().select_related(
-        'sprint', 'created_by', 'updated_by'
+        'project', 'informed_by', 'assigned_to', 'created_by', 'updated_by'
     )
     serializer_class = IssueSerializer
 

@@ -61,6 +61,18 @@ class ProjectPlanningSerializer(AuditSerializer):
             'updated_by',
         )
 
+    def validate(self, attrs):
+        attrs = super().validate(attrs)
+        start_date = attrs.get('planned_start_date', getattr(self.instance, 'planned_start_date', None))
+        end_date = attrs.get('planned_end_date', getattr(self.instance, 'planned_end_date', None))
+
+        if start_date and end_date and end_date < start_date:
+            raise serializers.ValidationError({
+                'planned_end_date': 'Planned end date cannot be before planned start date.'
+            })
+
+        return attrs
+
 
 class ProjectFinancialSerializer(AuditSerializer):
     estimated_budget = serializers.DecimalField(max_digits=12, decimal_places=2, help_text="Estimated total budget for the project")
@@ -112,6 +124,18 @@ class SprintSerializer(AuditSerializer):
             'updated_by',
         )
 
+    def validate(self, attrs):
+        attrs = super().validate(attrs)
+        start_date = attrs.get('start_date', getattr(self.instance, 'start_date', None))
+        end_date = attrs.get('end_date', getattr(self.instance, 'end_date', None))
+
+        if start_date and end_date and end_date < start_date:
+            raise serializers.ValidationError({
+                'end_date': 'Sprint end date cannot be before sprint start date.'
+            })
+
+        return attrs
+
 class IssueSerializer(AuditSerializer):
     class Meta:
         model = Issues
@@ -124,6 +148,18 @@ class IssueSerializer(AuditSerializer):
             'created_by',
             'updated_by',
         )
+
+    def validate(self, attrs):
+        attrs = super().validate(attrs)
+        due_date = attrs.get('due_date', getattr(self.instance, 'due_date', None))
+        created_at = getattr(self.instance, 'created_at', None)
+
+        if due_date and created_at and due_date < created_at.date():
+            raise serializers.ValidationError({
+                'due_date': 'Due date cannot be before the issue creation date.'
+            })
+
+        return attrs
 
 class IssueCommentSerializer(AuditSerializer):
     class Meta:
@@ -150,6 +186,18 @@ class IssueAuctionSerializer(AuditSerializer):
             'created_by',
             'updated_by',
         )
+
+    def validate(self, attrs):
+        attrs = super().validate(attrs)
+        start_date = attrs.get('start_date', getattr(self.instance, 'start_date', None))
+        end_date = attrs.get('end_date', getattr(self.instance, 'end_date', None))
+
+        if start_date and end_date and end_date < start_date:
+            raise serializers.ValidationError({
+                'end_date': 'Auction end date cannot be before auction start date.'
+            })
+
+        return attrs
 
 class IssueBidSerializer(AuditSerializer):
     class Meta:
