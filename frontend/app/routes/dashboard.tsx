@@ -1,125 +1,155 @@
 import { useEffect, useState } from "react";
 import { Link, useNavigate } from "react-router";
 
+import { AppHeader } from "../components/app-header";
 import type { Route } from "./+types/dashboard";
-import { clearSession, getStoredToken, getStoredUser, type StoredUser } from "../lib/auth";
+import { fetchProjects, logoutRequest, type Project } from "../lib/api";
+import { clearSession, getActiveSession, type StoredUser } from "../lib/auth";
 
 export function meta({}: Route.MetaArgs) {
   return [
-    { title: "WorkTrack | Dashboard" },
-    { name: "description", content: "Panel principal de WorkTrack." },
+    { title: "WorkTrack | Inicio" },
+    { name: "description", content: "Vista principal de WorkTrack." },
   ];
 }
 
 export default function Dashboard() {
   const navigate = useNavigate();
   const [user, setUser] = useState<StoredUser | null>(null);
+  const [token, setToken] = useState<string | null>(null);
+  const [projects, setProjects] = useState<Project[]>([]);
+  const [isLoading, setIsLoading] = useState(true);
 
   useEffect(() => {
-    const token = getStoredToken();
-    const storedUser = getStoredUser();
-
-    if (!token || !storedUser) {
+    const session = getActiveSession();
+    if (!session) {
       navigate("/", { replace: true });
       return;
     }
 
-    setUser(storedUser);
+    setToken(session.token);
+    setUser(session.user);
   }, [navigate]);
 
-  function handleLogout() {
+  useEffect(() => {
+    if (!token) {
+      return;
+    }
+
+    const authToken = token;
+
+    async function loadProjects() {
+      try {
+        setIsLoading(true);
+        setProjects(await fetchProjects(authToken));
+      } catch {
+        clearSession();
+        navigate("/", { replace: true });
+      } finally {
+        setIsLoading(false);
+      }
+    }
+
+    void loadProjects();
+  }, [navigate, token]);
+
+  async function handleLogout() {
+    if (token) {
+      try {
+        await logoutRequest(token);
+      } catch {
+        // Local cleanup still matters even if backend logout fails.
+      }
+    }
+
     clearSession();
     navigate("/", { replace: true });
   }
 
+  const activeProjects = projects.filter((project) => project.status === "In Progress").length;
+  const doneProjects = projects.filter((project) => project.status === "Completed").length;
+  const waitingProjects = projects.filter((project) => project.status === "Not Started").length;
+  const latestProjects = [...projects].slice(0, 3);
+
   return (
-    <main className="workspace-shell">
-      <section className="workspace-frame">
-        <aside className="workspace-sidebar">
-          <div className="workspace-brand">
-            <p className="eyebrow">Portal interno</p>
-            <h1>WorkTrack</h1>
-          </div>
+    <main className="page-shell">
+      <AppHeader
+        onLogout={handleLogout}
+        subtitle={user ? user.first_name || user.username : "Usuario"}
+      />
 
-          <nav aria-label="Principal" className="workspace-nav">
-            <Link className="is-active" to="/dashboard">
-              Dashboard
-            </Link>
-            <Link to="/dashboard/projects">Proyectos</Link>
-          </nav>
-
-          <div className="workspace-user">
-            <strong>{user ? user.first_name || user.username : "Usuario"}</strong>
-            <p className="muted-copy">{user?.email || "Sesion activa"}</p>
-            <button className="ghost-button" onClick={handleLogout} type="button">
-              Cerrar sesion
-            </button>
-          </div>
-        </aside>
-
-        <section className="workspace-main">
-          <header className="section-heading">
-            <p className="eyebrow">Dashboard</p>
-            <h1>Centro de control</h1>
+      <section className="page-body">
+        <section className="hero-simple">
+          <div className="hero-copy">
+            <span className="hero-kicker">Panel general</span>
+            <h1>Proyectos en un solo lugar</h1>
             <p className="subtle-copy">
-              Vista general del entorno de trabajo con enfoque operativo y de seguimiento.
+              Consulta rapidamente el estado del portafolio y entra al detalle de cada proyecto.
             </p>
-          </header>
+          </div>
+          <Link className="primary-button" to="/dashboard/projects">
+            Ver proyectos
+          </Link>
+        </section>
 
-          <section className="toolbar">
-            <div>
-              <h2>Resumen del dia</h2>
-              <p className="subtle-copy">
-                Espacio previsto para consolidar pendientes, actividad y entregables.
-              </p>
+        <section className="summary-grid">
+          <article className="simple-card">
+            <span className="simple-label">Total</span>
+            <strong>{isLoading ? "..." : projects.length}</strong>
+          </article>
+
+          <article className="simple-card">
+            <span className="simple-label">En progreso</span>
+            <strong>{isLoading ? "..." : activeProjects}</strong>
+          </article>
+
+          <article className="simple-card">
+            <span className="simple-label">Completados</span>
+            <strong>{isLoading ? "..." : doneProjects}</strong>
+          </article>
+
+          <article className="simple-card simple-card-accent">
+            <span className="simple-label">Por iniciar</span>
+            <strong>{isLoading ? "..." : waitingProjects}</strong>
+          </article>
+        </section>
+
+        <section className="dashboard-grid">
+          <article className="simple-panel">
+            <h2>Resumen rapido</h2>
+            <div className="highlight-strip">
+              <div>
+                <span>Activos</span>
+                <strong>{isLoading ? "..." : activeProjects}</strong>
+              </div>
+              <div>
+                <span>Total</span>
+                <strong>{isLoading ? "..." : projects.length}</strong>
+              </div>
             </div>
-            <div className="toolbar-actions">
-              <Link className="secondary-button" to="/dashboard/projects">
-                Administrar proyectos
-              </Link>
-            </div>
-          </section>
+          </article>
 
-          <section className="overview-grid">
-            <article className="summary-card">
-              <p className="eyebrow">Estado</p>
-              <strong>Sesion activa</strong>
-              <p className="muted-copy">Acceso autenticado y listo para operar sobre modulos internos.</p>
-            </article>
-
-            <article className="summary-card">
-              <p className="eyebrow">Usuario</p>
-              <strong>{user ? user.first_name || user.username : "WorkTrack"}</strong>
-              <p className="muted-copy">Identidad base para permisos, asignaciones y seguimiento.</p>
-            </article>
-
-            <article className="summary-card">
-              <p className="eyebrow">Modulo siguiente</p>
-              <strong>Proyectos</strong>
-              <p className="muted-copy">Area ya conectada al backend para administracion de registros.</p>
-            </article>
-          </section>
-
-          <section className="placeholder-grid">
-            <article className="surface-panel">
-              <p className="eyebrow">Agenda operativa</p>
-              <h2>Elementos previstos para esta vista</h2>
-              <ul className="checklist">
-                <li>Seguimiento de actividad reciente por equipo y por proyecto.</li>
-                <li>Concentrado de incidencias, bloqueos y prioridades.</li>
-                <li>Resumen de entregables pendientes y metas de corto plazo.</li>
-              </ul>
-            </article>
-
-            <article className="surface-panel">
-              <p className="eyebrow">Notas</p>
-              <h2>Panel en preparacion</h2>
-              <p className="muted-copy">
-                Esta pantalla queda deliberadamente sobria y funcional para servir como
-                base de un sistema interno de gestion, no como landing promocional.
-              </p>
-            </article>
-          </section>
+          <article className="simple-panel">
+            <h2>Ultimos proyectos</h2>
+            {isLoading ? (
+              <p className="muted-copy">Cargando informacion.</p>
+            ) : latestProjects.length === 0 ? (
+              <p className="muted-copy">Todavia no hay proyectos.</p>
+            ) : (
+              <div className="mini-project-list">
+                {latestProjects.map((project) => (
+                  <Link
+                    key={project.project_id}
+                    className="mini-project-card"
+                    to={`/dashboard/projects/${project.project_id}`}
+                  >
+                    <strong>{project.name}</strong>
+                    <span>{project.client || "Sin cliente"}</span>
+                  </Link>
+                ))}
+              </div>
+            )}
+          </article>
         </section>
       </section>
     </main>
