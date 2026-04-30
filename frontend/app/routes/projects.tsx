@@ -1,36 +1,50 @@
-import { useEffect, useState } from "react";
-import { Link, useNavigate } from "react-router";
+import { useEffect, useMemo, useState } from "react";
+import { Link } from "react-router";
 
-import { AppHeader } from "../components/app-header";
 import { Modal } from "../components/modal";
 import { ProjectForm, type ProjectFormState } from "../components/project-form";
 import { useToast } from "../components/toast-provider";
-import type { Route } from "./+types/projects";
 import {
   createProject,
   deleteProject,
   fetchProjects,
-  type Project,
-  logoutRequest,
+  PROJECT_STATUSES,
   updateProject,
+  type Project,
 } from "../lib/api";
-import { clearSession, getActiveSession, type StoredUser } from "../lib/auth";
+import { useDashboardContext } from "../lib/dashboard";
 
 const EMPTY_FORM: ProjectFormState = {
   client: "",
   description: "",
+  managerMode: "me",
   name: "",
   project_type: "",
   status: "Not Started",
-  managerMode: "me",
 };
 
-function toPayload(form: ProjectFormState, user: StoredUser) {
+type FiltersState = {
+  description: string;
+  manager: string;
+  name: string;
+  project_type: string;
+  status: string;
+};
+
+const EMPTY_FILTERS: FiltersState = {
+  description: "",
+  manager: "",
+  name: "",
+  project_type: "",
+  status: "",
+};
+
+function toPayload(form: ProjectFormState, userId: number) {
   return {
     client: form.client.trim() || null,
     description: form.description.trim() || null,
     name: form.name.trim(),
-    project_manager: form.managerMode === "me" ? user.id : null,
+    project_manager: form.managerMode === "me" ? userId : null,
     project_type: form.project_type.trim() || null,
     status: form.status,
   };
@@ -40,80 +54,76 @@ function toForm(project: Project): ProjectFormState {
   return {
     client: project.client ?? "",
     description: project.description ?? "",
+    managerMode: project.project_manager === null ? "unassigned" : "me",
     name: project.name,
     project_type: project.project_type ?? "",
     status: project.status,
-    managerMode: project.project_manager === null ? "unassigned" : "me",
   };
 }
 
-export function meta({}: Route.MetaArgs) {
+function truncate(value: string | null | undefined, limit = 150) {
+  if (!value) {
+    return "Sin descripcion.";
+  }
+
+  return value.length > limit ? `${value.slice(0, limit - 3)}...` : value;
+}
+
+export function meta() {
   return [
     { title: "WorkTrack | Proyectos" },
-    { name: "description", content: "Administracion de proyectos." },
+    { name: "description", content: "Gestion de proyectos y acciones masivas." },
   ];
 }
 
 export default function Projects() {
-  const navigate = useNavigate();
   const toast = useToast();
-  const [token, setToken] = useState<string | null>(null);
-  const [user, setUser] = useState<StoredUser | null>(null);
+  const { token, user } = useDashboardContext();
   const [projects, setProjects] = useState<Project[]>([]);
+  const [filters, setFilters] = useState<FiltersState>(EMPTY_FILTERS);
+  const [selectedIds, setSelectedIds] = useState<string[]>([]);
   const [form, setForm] = useState<ProjectFormState>(EMPTY_FORM);
   const [editingProjectId, setEditingProjectId] = useState<string | null>(null);
+  const [bulkStatus, setBulkStatus] = useState<string>("In Progress");
   const [isLoading, setIsLoading] = useState(true);
   const [isSaving, setIsSaving] = useState(false);
-  const [deletingId, setDeletingId] = useState<string | null>(null);
-  const [error, setError] = useState<string | null>(null);
-  const [projectToDelete, setProjectToDelete] = useState<Project | null>(null);
-  const [isFormModalOpen, setIsFormModalOpen] = useState(false);
+  const [modal, setModal] = useState<"create" | "edit" | "bulk-status" | "bulk-delete" | null>(null);
+
+  async function loadProjects() {
+    setIsLoading(true);
+    try {
+      const payload = await fetchProjects(token);
+      setProjects(payload);
+    } finally {
+      setIsLoading(false);
+    }
+  }
 
   useEffect(() => {
-    const session = getActiveSession();
-    if (!session) {
-      navigate("/", { replace: true });
-      return;
-    }
-
-    setToken(session.token);
-    setUser(session.user);
-  }, [navigate]);
-
-  useEffect(() => {
-    if (!token) {
-      return;
-    }
-
-    const authToken = token;
-
-    async function loadProjects() {
-      try {
-        setIsLoading(true);
-        setError(null);
-        setProjects(await fetchProjects(authToken));
-      } catch {
-        clearSession();
-        navigate("/", { replace: true });
-      } finally {
-        setIsLoading(false);
-      }
-    }
-
     void loadProjects();
-  }, [navigate, token]);
+  }, [token]);
 
-  async function handleLogout() {
-    if (token) {
-      try {
-        await logoutRequest(token);
-      } catch {
-        // Local cleanup still matters even if backend logout fails.
-      }
-    }
+  const filteredProjects = useMemo(() => {
+    return projects.filter((project) => {
+      const name = project.name.toLowerCase();
+      const description = (project.description ?? "").toLowerCase();
+      const type = (project.project_type ?? "").toLowerCase();
+      const manager = project.project_manager === user.id ? "me" : project.project_manager === null ? "unassigned" : "other";
 
-    clearSession();
-    navigate("/", { replace: true });
+      return (
+        (!filters.status || project.status === filters.status) &&
+        (!filters.name || name.includes(filters.name.toLowerCase())) &&
+        (!filters.description || description.includes(filters.description.toLowerCase())) &&
+        (!filters.project_type || type.includes(filters.project_type.toLowerCase())) &&
+        (!filters.manager || manager === filters.manager)
+      );
+    });
+  }, [filters, projects, user.id]);
+
+  function toggleSelection(projectId: string) {
+    setSelectedIds((current) =>
+      current.includes(projectId) ? current.filter((id) => id !== projectId) : [...current, projectId],
+    );
   }
 
   function resetForm() {
@@ -121,239 +131,256 @@ export default function Projects() {
     setEditingProjectId(null);
   }
 
-  function openCreateModal() {
-    resetForm();
-    setError(null);
-    setIsFormModalOpen(true);
-  }
-
-  function handleEdit(project: Project) {
-    setEditingProjectId(project.project_id);
-    setForm(toForm(project));
-    setError(null);
-    setIsFormModalOpen(true);
-  }
-
-  function closeFormModal() {
-    if (isSaving) {
-      return;
-    }
-
-    setIsFormModalOpen(false);
-    resetForm();
-  }
-
   async function handleSubmit(event: React.FormEvent<HTMLFormElement>) {
     event.preventDefault();
-
-    if (!token || !user) {
-      navigate("/", { replace: true });
-      return;
-    }
-
     if (!form.name.trim()) {
-      toast.error("Escribe un nombre.");
+      toast.error("Escribe un nombre para el proyecto.");
       return;
     }
 
-    const isEditing = editingProjectId !== null;
-
+    setIsSaving(true);
     try {
-      setIsSaving(true);
-      setError(null);
-
-      if (!isEditing) {
-        await createProject(token, toPayload(form, user));
-      } else if (editingProjectId) {
-        await updateProject(token, editingProjectId, toPayload(form, user));
+      if (editingProjectId) {
+        await updateProject(token, editingProjectId, toPayload(form, user.id));
+        toast.success("Proyecto actualizado.");
+      } else {
+        await createProject(token, toPayload(form, user.id));
+        toast.success("Proyecto creado.");
       }
 
-      setProjects(await fetchProjects(token));
-      toast.success(isEditing ? "Proyecto actualizado." : "Proyecto creado.");
-      setIsFormModalOpen(false);
+      await loadProjects();
       resetForm();
-    } catch (saveError) {
-      toast.error(saveError instanceof Error ? saveError.message : "No fue posible guardar el proyecto.");
+      setModal(null);
+    } catch (error) {
+      toast.error(error instanceof Error ? error.message : "No fue posible guardar el proyecto.");
     } finally {
       setIsSaving(false);
     }
   }
 
-  async function handleDelete(projectId: string) {
-    if (!token) {
-      navigate("/", { replace: true });
+  async function applyBulkStatus() {
+    if (selectedIds.length === 0) {
       return;
     }
 
+    setIsSaving(true);
     try {
-      setDeletingId(projectId);
-      setError(null);
+      await Promise.all(
+        selectedIds.map(async (projectId) => {
+          const project = projects.find((item) => item.project_id === projectId);
+          if (!project) {
+            return;
+          }
 
-      await deleteProject(token, projectId);
-      setProjects((current) => current.filter((project) => project.project_id !== projectId));
+          await updateProject(token, projectId, {
+            client: project.client,
+            description: project.description,
+            name: project.name,
+            project_manager: project.project_manager,
+            project_type: project.project_type,
+            status: bulkStatus,
+          });
+        }),
+      );
 
-      if (editingProjectId === projectId) {
-        resetForm();
-      }
-
-      setProjectToDelete(null);
-      toast.success("Proyecto eliminado.");
-    } catch (deleteError) {
-      toast.error(deleteError instanceof Error ? deleteError.message : "No fue posible eliminar el proyecto.");
+      toast.success("Estado actualizado en los proyectos seleccionados.");
+      setSelectedIds([]);
+      setModal(null);
+      await loadProjects();
+    } catch (error) {
+      toast.error(error instanceof Error ? error.message : "No fue posible aplicar la accion masiva.");
     } finally {
-      setDeletingId(null);
+      setIsSaving(false);
+    }
+  }
+
+  async function applyBulkDelete() {
+    if (selectedIds.length === 0) {
+      return;
+    }
+
+    setIsSaving(true);
+    try {
+      await Promise.all(selectedIds.map((projectId) => deleteProject(token, projectId)));
+      toast.success("Proyectos eliminados.");
+      setSelectedIds([]);
+      setModal(null);
+      await loadProjects();
+    } catch (error) {
+      toast.error(error instanceof Error ? error.message : "No fue posible eliminar los proyectos seleccionados.");
+    } finally {
+      setIsSaving(false);
     }
   }
 
   return (
-    <main className="page-shell">
-      <AppHeader
-        onLogout={handleLogout}
-        subtitle={user ? user.first_name || user.username : "Usuario"}
-      />
-
-      <section className="page-body">
-        <section className="hero-simple">
-          <div>
-            <h1>Proyectos</h1>
-            <p className="subtle-copy">Administra los datos reales de cada proyecto.</p>
-          </div>
-          <div className="hero-actions">
-            <div className="simple-badge">{projects.length}</div>
-            <button className="primary-button" onClick={openCreateModal} type="button">
-              Nuevo proyecto
-            </button>
-          </div>
-        </section>
-
-        <section className="projects-grid">
-          <section className="simple-panel projects-full-width">
-            <div className="panel-header">
-              <h2>Listado</h2>
-            </div>
-
-            {error ? <div className="status error">{error}</div> : null}
-
-            {isLoading ? <div className="status muted">Cargando proyectos...</div> : null}
-
-            {!isLoading && projects.length === 0 ? (
-              <div className="empty-state">
-                <h3>No hay proyectos</h3>
-                <p>Cuando crees uno aparecera aqui.</p>
-              </div>
-            ) : null}
-
-            {!isLoading && projects.length > 0 ? (
-              <div className="project-list">
-                {projects.map((project) => (
-                  <article className="project-item" key={project.project_id}>
-                    <div className="project-item-main">
-                      <div className="project-item-top">
-                        <div>
-                          <h3>
-                            <Link className="project-link" to={`/dashboard/projects/${project.project_id}`}>
-                              {project.name}
-                            </Link>
-                          </h3>
-                          {project.client ? (
-                            <p className="project-meta-line">{project.client}</p>
-                          ) : null}
-                        </div>
-                        <span
-                          className={`status-pill status-${project.status.toLowerCase().replaceAll(" ", "-")}`}
-                        >
-                          {project.status}
-                        </span>
-                      </div>
-                      {project.description ? <p>{project.description}</p> : null}
-                      <dl className="project-facts">
-                        <div>
-                          <dt>Tipo</dt>
-                          <dd>{project.project_type || "Sin definir"}</dd>
-                        </div>
-                        <div>
-                          <dt>Responsable</dt>
-                          <dd>
-                            {project.project_manager === user?.id
-                              ? "Tu usuario"
-                              : project.project_manager === null
-                                ? "Sin asignar"
-                                : `Usuario #${project.project_manager}`}
-                          </dd>
-                        </div>
-                      </dl>
-                    </div>
-
-                    <div className="project-item-actions">
-                      <Link
-                        className="secondary-button"
-                        to={`/dashboard/projects/${project.project_id}`}
-                      >
-                        Ver
-                      </Link>
-                      <button
-                        className="secondary-button"
-                        type="button"
-                        onClick={() => handleEdit(project)}
-                      >
-                        Editar
-                      </button>
-                      <button
-                        className="danger-button"
-                        disabled={deletingId === project.project_id}
-                        type="button"
-                        onClick={() => setProjectToDelete(project)}
-                      >
-                        {deletingId === project.project_id ? "Eliminando..." : "Eliminar"}
-                      </button>
-                    </div>
-                  </article>
-                ))}
-              </div>
-            ) : null}
-          </section>
-        </section>
+    <section className="dashboard-content">
+      <section className="hero-banner compact">
+        <div>
+          <span className="hero-kicker">Portafolio</span>
+          <h1>Gestiona proyectos con filtros y acciones masivas.</h1>
+          <p className="subtle-copy">Cada card muestra estado, responsable y acceso inmediato al detalle operativo.</p>
+        </div>
+        <div className="hero-actions">
+          <button className="primary-button" onClick={() => setModal("create")} type="button">
+            Nuevo proyecto
+          </button>
+          <button className="secondary-button" disabled={selectedIds.length === 0} onClick={() => setModal("bulk-status")} type="button">
+            Cambiar estado
+          </button>
+          <button className="danger-button" disabled={selectedIds.length === 0} onClick={() => setModal("bulk-delete")} type="button">
+            Eliminar seleccion
+          </button>
+        </div>
       </section>
 
-      {isFormModalOpen ? (
-        <Modal
-          onClose={closeFormModal}
-          title={editingProjectId ? "Editar proyecto" : "Nuevo proyecto"}
-        >
+      <section className="simple-panel filters-panel">
+        <div className="panel-header">
+          <h2>Filtros</h2>
+          <button className="ghost-button" onClick={() => setFilters(EMPTY_FILTERS)} type="button">
+            Limpiar
+          </button>
+        </div>
+        <div className="form-grid form-grid-5">
+          <label className="field">
+            <span>Estado</span>
+            <select value={filters.status} onChange={(event) => setFilters((current) => ({ ...current, status: event.target.value }))}>
+              <option value="">Todos</option>
+              {PROJECT_STATUSES.map((status) => (
+                <option key={status} value={status}>
+                  {status}
+                </option>
+              ))}
+            </select>
+          </label>
+          <label className="field">
+            <span>Responsable</span>
+            <select value={filters.manager} onChange={(event) => setFilters((current) => ({ ...current, manager: event.target.value }))}>
+              <option value="">Todos</option>
+              <option value="me">Yo</option>
+              <option value="unassigned">Sin asignar</option>
+              <option value="other">Otros</option>
+            </select>
+          </label>
+          <label className="field">
+            <span>Nombre</span>
+            <input type="text" value={filters.name} onChange={(event) => setFilters((current) => ({ ...current, name: event.target.value }))} />
+          </label>
+          <label className="field">
+            <span>Descripcion</span>
+            <input type="text" value={filters.description} onChange={(event) => setFilters((current) => ({ ...current, description: event.target.value }))} />
+          </label>
+          <label className="field">
+            <span>Tipo</span>
+            <input type="text" value={filters.project_type} onChange={(event) => setFilters((current) => ({ ...current, project_type: event.target.value }))} />
+          </label>
+        </div>
+      </section>
+
+      <section className="cards-grid">
+        {isLoading ? <div className="status muted">Cargando proyectos...</div> : null}
+        {!isLoading && filteredProjects.length === 0 ? (
+          <div className="empty-state-card">
+            <h3>Sin resultados</h3>
+            <p>No hay proyectos que coincidan con los filtros actuales.</p>
+          </div>
+        ) : null}
+        {filteredProjects.map((project) => (
+          <article className="portfolio-card" key={project.project_id}>
+            <div className="portfolio-card-top">
+              <label className="selection-toggle">
+                <input checked={selectedIds.includes(project.project_id)} onChange={() => toggleSelection(project.project_id)} type="checkbox" />
+                <span>Seleccionar</span>
+              </label>
+              <span className={`status-pill status-${project.status.toLowerCase().replaceAll(" ", "-")}`}>{project.status}</span>
+            </div>
+            <div className="portfolio-card-body">
+              <h3>{project.name}</h3>
+              <p>{truncate(project.description)}</p>
+            </div>
+            <dl className="project-facts project-facts-single">
+              <div>
+                <dt>Tipo</dt>
+                <dd>{project.project_type || "Sin definir"}</dd>
+              </div>
+              <div>
+                <dt>Responsable</dt>
+                <dd>{project.project_manager === user.id ? "Tu usuario" : project.project_manager === null ? "Sin asignar" : `Usuario #${project.project_manager}`}</dd>
+              </div>
+            </dl>
+            <div className="portfolio-card-actions">
+              <Link className="secondary-button" to={`/dashboard/projects/${project.project_id}`}>
+                Abrir
+              </Link>
+              <button
+                className="ghost-button"
+                onClick={() => {
+                  setEditingProjectId(project.project_id);
+                  setForm(toForm(project));
+                  setModal("edit");
+                }}
+                type="button"
+              >
+                Editar
+              </button>
+            </div>
+          </article>
+        ))}
+      </section>
+
+      {(modal === "create" || modal === "edit") ? (
+        <Modal onClose={() => !isSaving && setModal(null)} title={modal === "create" ? "Nuevo proyecto" : "Editar proyecto"}>
           <ProjectForm
             form={form}
             isSaving={isSaving}
-            submitLabel={editingProjectId ? "Guardar cambios" : "Crear proyecto"}
+            submitLabel={modal === "create" ? "Crear proyecto" : "Guardar cambios"}
             onChange={setForm}
             onSubmit={handleSubmit}
           />
         </Modal>
       ) : null}
 
-      {projectToDelete ? (
-        <Modal onClose={() => setProjectToDelete(null)} title="Eliminar proyecto">
-          <div className="confirm-block">
-            <p>Se eliminara <strong>{projectToDelete.name}</strong>.</p>
+      {modal === "bulk-status" ? (
+        <Modal onClose={() => !isSaving && setModal(null)} title="Cambiar estado">
+          <div className="stack-form">
+            <p>Se actualizara el estado de {selectedIds.length} proyectos seleccionados.</p>
+            <label className="field">
+              <span>Nuevo estado</span>
+              <select value={bulkStatus} onChange={(event) => setBulkStatus(event.target.value)}>
+                {PROJECT_STATUSES.map((status) => (
+                  <option key={status} value={status}>
+                    {status}
+                  </option>
+                ))}
+              </select>
+            </label>
             <div className="confirm-actions">
-              <button
-                className="secondary-button"
-                onClick={() => setProjectToDelete(null)}
-                type="button"
-              >
+              <button className="secondary-button" onClick={() => setModal(null)} type="button">
                 Cancelar
               </button>
-              <button
-                className="danger-button"
-                disabled={deletingId === projectToDelete.project_id}
-                onClick={() => handleDelete(projectToDelete.project_id)}
-                type="button"
-              >
-                {deletingId === projectToDelete.project_id ? "Eliminando..." : "Eliminar"}
+              <button className="primary-button" disabled={isSaving} onClick={applyBulkStatus} type="button">
+                {isSaving ? "Aplicando..." : "Confirmar"}
               </button>
             </div>
           </div>
         </Modal>
       ) : null}
-    </main>
+
+      {modal === "bulk-delete" ? (
+        <Modal onClose={() => !isSaving && setModal(null)} title="Eliminar proyectos">
+          <div className="stack-form">
+            <p>Se eliminaran {selectedIds.length} proyectos. Esta accion requiere confirmacion y no se puede deshacer.</p>
+            <div className="confirm-actions">
+              <button className="secondary-button" onClick={() => setModal(null)} type="button">
+                Cancelar
+              </button>
+              <button className="danger-button" disabled={isSaving} onClick={applyBulkDelete} type="button">
+                {isSaving ? "Eliminando..." : "Confirmar eliminacion"}
+              </button>
+            </div>
+          </div>
+        </Modal>
+      ) : null}
+    </section>
   );
 }

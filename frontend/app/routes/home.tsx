@@ -2,11 +2,10 @@ import { useState } from "react";
 import { useNavigate } from "react-router";
 
 import { useToast } from "../components/toast-provider";
-import type { Route } from "./+types/home";
 import { loginRequest } from "../lib/api";
-import { storeSession } from "../lib/auth";
+import { getDefaultDashboardPath, storeSession } from "../lib/auth";
 
-export function meta({}: Route.MetaArgs) {
+export function meta() {
   return [
     { title: "WorkTrack | Acceso" },
     { name: "description", content: "Acceso a WorkTrack." },
@@ -37,7 +36,7 @@ export default function Home() {
       toast.success(`Bienvenido, ${payload.user.username}.`);
 
       setPassword("");
-      navigate("/dashboard", { replace: true });
+      navigate(getDefaultDashboardPath(payload.user), { replace: true });
     } catch (error) {
       toast.error(error instanceof Error ? error.message : "No se pudo iniciar sesion.");
     } finally {

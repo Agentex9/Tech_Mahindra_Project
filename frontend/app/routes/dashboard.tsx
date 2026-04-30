@@ -1,24 +1,93 @@
 import { useEffect, useState } from "react";
-import { Link, useNavigate } from "react-router";
+import { NavLink, Outlet, useLocation, useNavigate } from "react-router";
 
-import { AppHeader } from "../components/app-header";
-import type { Route } from "./+types/dashboard";
-import { fetchProjects, logoutRequest, type Project } from "../lib/api";
-import { clearSession, getActiveSession, type StoredUser } from "../lib/auth";
+import { logoutRequest } from "../lib/api";
+import {
+  clearSession,
+  getActiveSession,
+  isAdmin,
+  isPrivilegedUser,
+  type StoredUser,
+} from "../lib/auth";
+import { applyTheme, getPreferredTheme, type ThemeMode } from "../lib/theme";
 
-export function meta({}: Route.MetaArgs) {
+type NavigationItem = {
+  allowed: (user: StoredUser) => boolean;
+  label: string;
+  subtitle: string;
+  to: string;
+};
+
+const NAV_ITEMS: NavigationItem[] = [
+  {
+    allowed: (user) => user.role.toLowerCase() !== "developer",
+    label: "Resumen",
+    subtitle: "Panel principal",
+    to: "/dashboard",
+  },
+  {
+    allowed: () => true,
+    label: "Proyectos",
+    subtitle: "Portafolio activo",
+    to: "/dashboard/projects",
+  },
+  {
+    allowed: () => true,
+    label: "Issues",
+    subtitle: "Trabajo operativo",
+    to: "/dashboard/issues",
+  },
+  {
+    allowed: () => true,
+    label: "Subasta",
+    subtitle: "Bids en curso",
+    to: "/dashboard/auction",
+  },
+  {
+    allowed: () => true,
+    label: "Ruleta",
+    subtitle: "Puntos y apuestas",
+    to: "/dashboard/roulette",
+  },
+  {
+    allowed: (user) => isPrivilegedUser(user),
+    label: "Agente",
+    subtitle: "Asistente interno",
+    to: "/dashboard/agent",
+  },
+  {
+    allowed: () => true,
+    label: "Perfil",
+    subtitle: "Cuenta y sesiones",
+    to: "/dashboard/profile",
+  },
+  {
+    allowed: (user) => isAdmin(user),
+    label: "Usuarios",
+    subtitle: "Administracion",
+    to: "/dashboard/users",
+  },
+];
+
+export function meta() {
   return [
-    { title: "WorkTrack | Inicio" },
-    { name: "description", content: "Vista principal de WorkTrack." },
+    { title: "WorkTrack | Dashboard" },
+    { name: "description", content: "Dashboard corporativo de WorkTrack." },
   ];
 }
 
-export default function Dashboard() {
+export default function DashboardLayout() {
+  const location = useLocation();
   const navigate = useNavigate();
+  const [theme, setTheme] = useState<ThemeMode>("light");
   const [user, setUser] = useState<StoredUser | null>(null);
   const [token, setToken] = useState<string | null>(null);
-  const [projects, setProjects] = useState<Project[]>([]);
-  const [isLoading, setIsLoading] = useState(true);
+
+  useEffect(() => {
+    const initialTheme = getPreferredTheme();
+    setTheme(initialTheme);
+    applyTheme(initialTheme);
+  }, []);
 
   useEffect(() => {
     const session = getActiveSession();
@@ -30,28 +99,6 @@ export default function Dashboard() {
     setToken(session.token);
     setUser(session.user);
   }, [navigate]);
-
-  useEffect(() => {
-    if (!token) {
-      return;
-    }
-
-    const authToken = token;
-
-    async function loadProjects() {
-      try {
-        setIsLoading(true);
-        setProjects(await fetchProjects(authToken));
-      } catch {
-        clearSession();
-        navigate("/", { replace: true });
-      } finally {
-        setIsLoading(false);
-      }
-    }
-
-    void loadProjects();
-  }, [navigate, token]);
 
   async function handleLogout() {
     if (token) {
@@ -66,91 +113,88 @@ export default function Dashboard() {
     navigate("/", { replace: true });
   }
 
-  const activeProjects = projects.filter((project) => project.status === "In Progress").length;
-  const doneProjects = projects.filter((project) => project.status === "Completed").length;
-  const waitingProjects = projects.filter((project) => project.status === "Not Started").length;
-  const latestProjects = [...projects].slice(0, 3);
+  function handleToggleTheme() {
+    const nextTheme: ThemeMode = theme === "light" ? "dark" : "light";
+    setTheme(nextTheme);
+    applyTheme(nextTheme);
+  }
+
+  if (!user || !token) {
+    return (
+      <main className="dashboard-loading-shell">
+        <section className="dashboard-loading-card">Cargando dashboard...</section>
+      </main>
+    );
+  }
+
+  const navItems = NAV_ITEMS.filter((item) => item.allowed(user));
+  const currentPath = location.pathname;
+  const currentItem =
+    navItems
+      .slice()
+      .sort((left, right) => right.to.length - left.to.length)
+      .find((item) => currentPath === item.to || currentPath.startsWith(`${item.to}/`)) ?? navItems[0];
 
   return (
-    <main className="page-shell">
-      <AppHeader
-        onLogout={handleLogout}
-        subtitle={user ? user.first_name || user.username : "Usuario"}
-      />
-
-      <section className="page-body">
-        <section className="hero-simple">
-          <div className="hero-copy">
-            <span className="hero-kicker">Panel general</span>
-            <h1>Proyectos en un solo lugar</h1>
-            <p className="subtle-copy">
-              Consulta rapidamente el estado del portafolio y entra al detalle de cada proyecto.
-            </p>
+    <main className="dashboard-shell">
+      <aside className="dashboard-sidebar">
+        <div className="sidebar-brand">
+          <div className="brand-mark" aria-hidden="true">
+            WT
           </div>
-          <Link className="primary-button" to="/dashboard/projects">
-            Ver proyectos
-          </Link>
-        </section>
+          <div>
+            <p className="brand-label">WorkTrack</p>
+            <h1>Control Center</h1>
+          </div>
+        </div>
 
-        <section className="summary-grid">
-          <article className="simple-card">
-            <span className="simple-label">Total</span>
-            <strong>{isLoading ? "..." : projects.length}</strong>
-          </article>
+        <div className="sidebar-user">
+          <strong>{user.first_name || user.username}</strong>
+          <span>{user.role}</span>
+          <span>{user.email || "Sin correo registrado"}</span>
+        </div>
 
-          <article className="simple-card">
-            <span className="simple-label">En progreso</span>
-            <strong>{isLoading ? "..." : activeProjects}</strong>
-          </article>
+        <nav aria-label="Dashboard" className="sidebar-nav">
+          {navItems.map((item) => (
+            <NavLink
+              key={item.to}
+              className={({ isActive }) =>
+                isActive || (item.to === "/dashboard" && currentPath === "/dashboard")
+                  ? "sidebar-link is-active"
+                  : "sidebar-link"
+              }
+              end={item.to === "/dashboard"}
+              to={item.to}
+            >
+              <strong>{item.label}</strong>
+              <span>{item.subtitle}</span>
+            </NavLink>
+          ))}
+        </nav>
 
-          <article className="simple-card">
-            <span className="simple-label">Completados</span>
-            <strong>{isLoading ? "..." : doneProjects}</strong>
-          </article>
+        <div className="sidebar-footer">
+          <button className="secondary-button" onClick={handleToggleTheme} type="button">
+            {theme === "light" ? "Modo oscuro" : "Modo claro"}
+          </button>
+          <button className="ghost-button" onClick={handleLogout} type="button">
+            Cerrar sesion
+          </button>
+        </div>
+      </aside>
 
-          <article className="simple-card simple-card-accent">
-            <span className="simple-label">Por iniciar</span>
-            <strong>{isLoading ? "..." : waitingProjects}</strong>
-          </article>
-        </section>
+      <section className="dashboard-main">
+        <header className="dashboard-topbar">
+          <div>
+            <p className="page-kicker">Dashboard corporativo</p>
+            <h2>{currentItem?.label ?? "WorkTrack"}</h2>
+          </div>
+          <div className="topbar-user">
+            <span>{user.username}</span>
+            <strong>{user.points_balance} pts</strong>
+          </div>
+        </header>
 
-        <section className="dashboard-grid">
-          <article className="simple-panel">
-            <h2>Resumen rapido</h2>
-            <div className="highlight-strip">
-              <div>
-                <span>Activos</span>
-                <strong>{isLoading ? "..." : activeProjects}</strong>
-              </div>
-              <div>
-                <span>Total</span>
-                <strong>{isLoading ? "..." : projects.length}</strong>
-              </div>
-            </div>
-          </article>
-
-          <article className="simple-panel">
-            <h2>Ultimos proyectos</h2>
-            {isLoading ? (
-              <p className="muted-copy">Cargando informacion.</p>
-            ) : latestProjects.length === 0 ? (
-              <p className="muted-copy">Todavia no hay proyectos.</p>
-            ) : (
-              <div className="mini-project-list">
-                {latestProjects.map((project) => (
-                  <Link
-                    key={project.project_id}
-                    className="mini-project-card"
-                    to={`/dashboard/projects/${project.project_id}`}
-                  >
-                    <strong>{project.name}</strong>
-                    <span>{project.client || "Sin cliente"}</span>
-                  </Link>
-                ))}
-              </div>
-            )}
-          </article>
-        </section>
+        <Outlet context={{ handleLogout, token, updateUser: setUser, user }} />
       </section>
     </main>
   );

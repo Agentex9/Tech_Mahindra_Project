@@ -1,0 +1,306 @@
+import { useEffect, useMemo, useState } from "react";
+
+import { useToast } from "../components/toast-provider";
+import { updateStoredUser } from "../lib/auth";
+import { useDashboardContext } from "../lib/dashboard";
+
+type RouletteSlot = {
+  color: "green" | "red" | "black";
+  label: string;
+  multiplier: number;
+  value: number;
+};
+
+type BetOption = "red" | "black" | "green" | "even" | "odd" | "low" | "high";
+
+type RouletteHistoryItem = {
+  amount: number;
+  balanceAfter: number;
+  multiplier: number;
+  option: BetOption;
+  payout: number;
+  result: number;
+  timestamp: string;
+  won: boolean;
+};
+
+const ROULETTE_STORAGE_KEY = "worktrack.roulette.history";
+
+const WHEEL: RouletteSlot[] = [
+  { color: "green", label: "0", multiplier: 14, value: 0 },
+  { color: "red", label: "1", multiplier: 2, value: 1 },
+  { color: "black", label: "2", multiplier: 2, value: 2 },
+  { color: "red", label: "3", multiplier: 2, value: 3 },
+  { color: "black", label: "4", multiplier: 2, value: 4 },
+  { color: "red", label: "5", multiplier: 2, value: 5 },
+  { color: "black", label: "6", multiplier: 2, value: 6 },
+  { color: "red", label: "7", multiplier: 2, value: 7 },
+  { color: "black", label: "8", multiplier: 2, value: 8 },
+  { color: "red", label: "9", multiplier: 2, value: 9 },
+  { color: "black", label: "10", multiplier: 2, value: 10 },
+  { color: "red", label: "11", multiplier: 2, value: 11 },
+  { color: "black", label: "12", multiplier: 2, value: 12 },
+];
+
+const BET_OPTIONS: Array<{ description: string; label: string; value: BetOption }> = [
+  { description: "Paga x2", label: "Rojo", value: "red" },
+  { description: "Paga x2", label: "Negro", value: "black" },
+  { description: "Paga x14", label: "Verde 0", value: "green" },
+  { description: "Paga x2", label: "Par", value: "even" },
+  { description: "Paga x2", label: "Impar", value: "odd" },
+  { description: "Paga x2", label: "1 a 6", value: "low" },
+  { description: "Paga x2", label: "7 a 12", value: "high" },
+];
+
+function loadHistory() {
+  if (typeof window === "undefined") {
+    return [] as RouletteHistoryItem[];
+  }
+
+  try {
+    const raw = window.localStorage.getItem(ROULETTE_STORAGE_KEY);
+    return raw ? (JSON.parse(raw) as RouletteHistoryItem[]) : [];
+  } catch {
+    return [];
+  }
+}
+
+function persistHistory(history: RouletteHistoryItem[]) {
+  if (typeof window === "undefined") {
+    return;
+  }
+
+  window.localStorage.setItem(ROULETTE_STORAGE_KEY, JSON.stringify(history.slice(0, 12)));
+}
+
+function isWinningBet(option: BetOption, slot: RouletteSlot) {
+  switch (option) {
+    case "red":
+      return slot.color === "red";
+    case "black":
+      return slot.color === "black";
+    case "green":
+      return slot.color === "green";
+    case "even":
+      return slot.value !== 0 && slot.value % 2 === 0;
+    case "odd":
+      return slot.value % 2 === 1;
+    case "low":
+      return slot.value >= 1 && slot.value <= 6;
+    case "high":
+      return slot.value >= 7 && slot.value <= 12;
+  }
+}
+
+function getMultiplier(option: BetOption) {
+  return option === "green" ? 14 : 2;
+}
+
+export function meta() {
+  return [
+    { title: "WorkTrack | Ruleta" },
+    { name: "description", content: "Ruleta de casino en frontend." },
+  ];
+}
+
+export default function RoulettePage() {
+  const toast = useToast();
+  const { updateUser, user } = useDashboardContext();
+  const [selectedOption, setSelectedOption] = useState<BetOption>("red");
+  const [betAmount, setBetAmount] = useState("10");
+  const [history, setHistory] = useState<RouletteHistoryItem[]>([]);
+  const [currentSlot, setCurrentSlot] = useState<RouletteSlot>(WHEEL[0]);
+  const [isSpinning, setIsSpinning] = useState(false);
+  const [spinResult, setSpinResult] = useState<RouletteHistoryItem | null>(null);
+
+  useEffect(() => {
+    setHistory(loadHistory());
+  }, []);
+
+  const recentWinRate = useMemo(() => {
+    if (history.length === 0) {
+      return 0;
+    }
+
+    return Math.round((history.filter((item) => item.won).length / history.length) * 100);
+  }, [history]);
+
+  function applyBalance(nextBalance: number) {
+    const nextUser = updateStoredUser({ points_balance: nextBalance });
+    if (nextUser) {
+      updateUser(nextUser);
+    }
+  }
+
+  async function handleSpin() {
+    const amount = Number(betAmount);
+
+    if (!Number.isFinite(amount) || amount <= 0) {
+      toast.error("Escribe una apuesta valida.");
+      return;
+    }
+
+    if (amount > user.points_balance) {
+      toast.error("No tienes puntos suficientes para esa apuesta.");
+      return;
+    }
+
+    setIsSpinning(true);
+    setSpinResult(null);
+
+    for (let index = 0; index < 18; index += 1) {
+      const slot = WHEEL[Math.floor(Math.random() * WHEEL.length)];
+      window.setTimeout(() => setCurrentSlot(slot), index * 70);
+    }
+
+    window.setTimeout(() => {
+      const finalSlot = WHEEL[Math.floor(Math.random() * WHEEL.length)];
+      const won = isWinningBet(selectedOption, finalSlot);
+      const multiplier = getMultiplier(selectedOption);
+      const payout = won ? amount * multiplier : 0;
+      const nextBalance = user.points_balance - amount + payout;
+
+      const entry: RouletteHistoryItem = {
+        amount,
+        balanceAfter: nextBalance,
+        multiplier,
+        option: selectedOption,
+        payout,
+        result: finalSlot.value,
+        timestamp: new Date().toISOString(),
+        won,
+      };
+
+      setCurrentSlot(finalSlot);
+      setSpinResult(entry);
+      setHistory((current) => {
+        const next = [entry, ...current].slice(0, 12);
+        persistHistory(next);
+        return next;
+      });
+      applyBalance(nextBalance);
+      setIsSpinning(false);
+      toast[won ? "success" : "error"](
+        won ? `Ganaste ${payout} pts.` : `Perdiste ${amount} pts.`,
+      );
+    }, 18 * 70 + 120);
+  }
+
+  return (
+    <section className="dashboard-content">
+      <section className="hero-banner compact">
+        <div>
+          <span className="hero-kicker">Ruleta</span>
+          <h1>Ruleta de casino con logica completa en frontend.</h1>
+          <p className="subtle-copy">La apuesta descuenta y paga puntos directamente sobre la sesion local del usuario.</p>
+        </div>
+        <div className="hero-actions">
+          <div className="simple-badge">{user.points_balance} pts</div>
+        </div>
+      </section>
+
+      <section className="roulette-layout">
+        <article className="simple-panel roulette-board-panel">
+          <div className="roulette-wheel-shell">
+            <div className={`roulette-wheel roulette-${currentSlot.color}`}>
+              <span>{currentSlot.label}</span>
+            </div>
+            <div className="roulette-ticker" aria-hidden="true" />
+          </div>
+          <div className="roulette-strip">
+            {WHEEL.map((slot) => (
+              <div className={`roulette-cell roulette-cell-${slot.color}`} key={slot.value}>
+                {slot.label}
+              </div>
+            ))}
+          </div>
+          {spinResult ? (
+            <div className={`status ${spinResult.won ? "success" : "error"}`}>
+              Resultado: {spinResult.result}. {spinResult.won ? `Pago ${spinResult.payout} pts.` : "Apuesta perdida."}
+            </div>
+          ) : null}
+        </article>
+
+        <article className="simple-panel">
+          <div className="panel-header panel-header-start">
+            <div>
+              <h2>Apuesta</h2>
+              <p className="muted-copy">Selecciona la opcion y define el monto.</p>
+            </div>
+          </div>
+          <div className="roulette-options">
+            {BET_OPTIONS.map((option) => (
+              <button
+                key={option.value}
+                className={selectedOption === option.value ? "bet-option is-active" : "bet-option"}
+                disabled={isSpinning}
+                onClick={() => setSelectedOption(option.value)}
+                type="button"
+              >
+                <strong>{option.label}</strong>
+                <span>{option.description}</span>
+              </button>
+            ))}
+          </div>
+          <label className="field">
+            <span>Monto</span>
+            <input
+              disabled={isSpinning}
+              min="1"
+              step="1"
+              type="number"
+              value={betAmount}
+              onChange={(event) => setBetAmount(event.target.value)}
+            />
+          </label>
+          <div className="confirm-actions">
+            <button className="primary-button" disabled={isSpinning} onClick={handleSpin} type="button">
+              {isSpinning ? "Girando..." : "Girar ruleta"}
+            </button>
+          </div>
+          <dl className="project-facts project-facts-single">
+            <div>
+              <dt>Balance actual</dt>
+              <dd>{user.points_balance} pts</dd>
+            </div>
+            <div>
+              <dt>Win rate reciente</dt>
+              <dd>{recentWinRate}%</dd>
+            </div>
+            <div>
+              <dt>Pago de la apuesta</dt>
+              <dd>x{getMultiplier(selectedOption)}</dd>
+            </div>
+          </dl>
+        </article>
+      </section>
+
+      <section className="simple-panel">
+        <div className="panel-header panel-header-start">
+          <div>
+            <h2>Historial reciente</h2>
+            <p className="muted-copy">Ultimos 12 giros guardados localmente.</p>
+          </div>
+        </div>
+        <div className="module-list">
+          {history.map((entry) => (
+            <article className="module-item" key={entry.timestamp}>
+              <div className="module-item-head">
+                <strong>{entry.option.toUpperCase()} · Resultado {entry.result}</strong>
+                <span className={entry.won ? "status-pill status-completed" : "status-pill status-cancelled"}>
+                  {entry.won ? "Ganada" : "Perdida"}
+                </span>
+              </div>
+              <div className="module-item-meta">
+                <span>Apuesta: {entry.amount} pts</span>
+                <span>Pago: {entry.payout} pts</span>
+                <span>Balance: {entry.balanceAfter} pts</span>
+              </div>
+            </article>
+          ))}
+          {history.length === 0 ? <p className="muted-copy">Todavia no hay giros registrados.</p> : null}
+        </div>
+      </section>
+    </section>
+  );
+}

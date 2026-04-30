@@ -1,11 +1,9 @@
 import { useEffect, useState } from "react";
 import { Link, useNavigate } from "react-router";
 
-import { AppHeader } from "../components/app-header";
 import { Modal } from "../components/modal";
 import { ProjectForm, type ProjectFormState } from "../components/project-form";
 import { useToast } from "../components/toast-provider";
-import type { Route } from "./+types/project-detail";
 import {
   createIssue,
   createProjectFinancial,
@@ -24,7 +22,6 @@ import {
   fetchProjectPlannings,
   fetchProjectRisks,
   fetchProjectSprints,
-  logoutRequest,
   updateIssue,
   updateProject,
   updateProjectFinancial,
@@ -43,7 +40,8 @@ import {
   type Sprint,
   type SprintPayload,
 } from "../lib/api";
-import { clearSession, getActiveSession, type StoredUser } from "../lib/auth";
+import type { StoredUser } from "../lib/auth";
+import { useDashboardContext } from "../lib/dashboard";
 import { formatShortSpanishDate, formatShortSpanishDateTime } from "../lib/date";
 
 type PlanningFormState = {
@@ -748,18 +746,17 @@ function IssueFormView({
   );
 }
 
-export function meta({}: Route.MetaArgs) {
+export function meta() {
   return [
     { title: "WorkTrack | Proyecto" },
     { name: "description", content: "Vista de detalle de proyecto." },
   ];
 }
 
-export default function ProjectDetail({ params }: Route.ComponentProps) {
+export default function ProjectDetail({ params }: { params: { projectId: string } }) {
   const navigate = useNavigate();
   const toast = useToast();
-  const [token, setToken] = useState<string | null>(null);
-  const [user, setUser] = useState<StoredUser | null>(null);
+  const { token, user } = useDashboardContext();
   const [project, setProject] = useState<Project | null>(null);
   const [projectForm, setProjectForm] = useState<ProjectFormState>(EMPTY_PROJECT_FORM);
   const [plannings, setPlannings] = useState<ProjectPlanning[]>([]);
@@ -782,17 +779,6 @@ export default function ProjectDetail({ params }: Route.ComponentProps) {
   const [isDeleting, setIsDeleting] = useState(false);
   const [error, setError] = useState<string | null>(null);
   const [modal, setModal] = useState<string | null>(null);
-
-  useEffect(() => {
-    const session = getActiveSession();
-    if (!session) {
-      navigate("/", { replace: true });
-      return;
-    }
-
-    setToken(session.token);
-    setUser(session.user);
-  }, [navigate]);
 
   useEffect(() => {
     if (!token) {
@@ -837,19 +823,6 @@ export default function ProjectDetail({ params }: Route.ComponentProps) {
 
     void loadAll();
   }, [params.projectId, token]);
-
-  async function handleLogout() {
-    if (token) {
-      try {
-        await logoutRequest(token);
-      } catch {
-        // Local cleanup still matters even if backend logout fails.
-      }
-    }
-
-    clearSession();
-    navigate("/", { replace: true });
-  }
 
   function closeModal() {
     if (isSaving || isDeleting) {
@@ -1134,13 +1107,8 @@ export default function ProjectDetail({ params }: Route.ComponentProps) {
   }
 
   return (
-    <main className="page-shell">
-      <AppHeader
-        onLogout={handleLogout}
-        subtitle={user ? user.first_name || user.username : "Usuario"}
-      />
-
-      <section className="page-body">
+    <>
+      <section className="dashboard-content">
         <div className="detail-back">
           <Link className="ghost-link" to="/dashboard/projects">
             Volver
@@ -1684,6 +1652,6 @@ export default function ProjectDetail({ params }: Route.ComponentProps) {
           </div>
         </Modal>
       ) : null}
-    </main>
+    </>
   );
 }
