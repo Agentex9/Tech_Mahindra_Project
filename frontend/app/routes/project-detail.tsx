@@ -6,6 +6,7 @@ import { ProjectForm, type ProjectFormState } from "../components/project-form";
 import { useToast } from "../components/toast-provider";
 import {
   createIssue,
+  createLabel,
   createProjectFinancial,
   createProjectPlanning,
   createProjectRisk,
@@ -19,6 +20,7 @@ import {
   fetchProject,
   fetchProjectFinancials,
   fetchProjectIssues,
+  fetchLabels,
   fetchProjectPlannings,
   fetchProjectRisks,
   fetchProjectSprints,
@@ -30,6 +32,8 @@ import {
   updateSprint,
   type Issue,
   type IssuePayload,
+  type Label,
+  type LabelPayload,
   type Project,
   type ProjectFinancial,
   type ProjectFinancialPayload,
@@ -40,6 +44,7 @@ import {
   type Sprint,
   type SprintPayload,
 } from "../lib/api";
+import { GradientColorPicker } from "../components/gradient-color-picker";
 import type { StoredUser } from "../lib/auth";
 import { useDashboardContext } from "../lib/dashboard";
 import { formatShortSpanishDate, formatShortSpanishDateTime } from "../lib/date";
@@ -143,6 +148,16 @@ const EMPTY_ISSUE_FORM: IssueFormState = {
   status: "Not Started",
   story_points: "",
   title: "",
+};
+
+type LabelFormState = {
+  color: string;
+  name: string;
+};
+
+const EMPTY_LABEL_FORM: LabelFormState = {
+  color: "#D0343E",
+  name: "",
 };
 
 const PRIORITY_OPTIONS = ["Low", "Medium", "High", "Critical"];
@@ -284,6 +299,15 @@ function toIssuePayload(form: IssueFormState, projectId: string, user: StoredUse
     status: form.status,
     story_points: form.story_points.trim() ? Number(form.story_points) : null,
     title: form.title.trim(),
+  };
+}
+
+function toLabelPayload(form: LabelFormState, projectId: string): LabelPayload {
+  const name = form.name.trim();
+  return {
+    color: form.color.trim() ? form.color.trim().toUpperCase() : null,
+    name,
+    project: projectId,
   };
 }
 
@@ -772,6 +796,8 @@ export default function ProjectDetail({ params }: { params: { projectId: string 
   const [sprintForm, setSprintForm] = useState<SprintFormState>(EMPTY_SPRINT_FORM);
   const [editingSprintId, setEditingSprintId] = useState<string | null>(null);
   const [issues, setIssues] = useState<Issue[]>([]);
+  const [labels, setLabels] = useState<Label[]>([]);
+  const [labelForm, setLabelForm] = useState<LabelFormState>(EMPTY_LABEL_FORM);
   const [issueForm, setIssueForm] = useState<IssueFormState>(EMPTY_ISSUE_FORM);
   const [editingIssueId, setEditingIssueId] = useState<string | null>(null);
   const [isLoading, setIsLoading] = useState(true);
@@ -798,6 +824,7 @@ export default function ProjectDetail({ params }: { params: { projectId: string 
           riskPayload,
           sprintPayload,
           issuePayload,
+          labelPayload,
         ] = await Promise.all([
           fetchProject(authToken, params.projectId),
           fetchProjectPlannings(authToken, params.projectId),
@@ -805,6 +832,7 @@ export default function ProjectDetail({ params }: { params: { projectId: string 
           fetchProjectRisks(authToken, params.projectId),
           fetchProjectSprints(authToken, params.projectId),
           fetchProjectIssues(authToken, params.projectId),
+          fetchLabels(authToken, params.projectId),
         ]);
 
         setProject(projectPayload);
@@ -814,6 +842,7 @@ export default function ProjectDetail({ params }: { params: { projectId: string 
         setRisks(riskPayload);
         setSprints(sprintPayload);
         setIssues(issuePayload);
+        setLabels(labelPayload);
       } catch (loadError) {
         setError(loadError instanceof Error ? loadError.message : "No fue posible cargar el proyecto.");
       } finally {
@@ -835,6 +864,7 @@ export default function ProjectDetail({ params }: { params: { projectId: string 
     setEditingRiskId(null);
     setEditingSprintId(null);
     setEditingIssueId(null);
+    setLabelForm(EMPTY_LABEL_FORM);
     setPlanningForm(EMPTY_PLANNING_FORM);
     setFinancialForm(EMPTY_FINANCIAL_FORM);
     setRiskForm(EMPTY_RISK_FORM);
@@ -1106,6 +1136,29 @@ export default function ProjectDetail({ params }: { params: { projectId: string 
     }
   }
 
+  async function handleSaveLabel(event: React.FormEvent<HTMLFormElement>) {
+    event.preventDefault();
+    if (!token || !project) return;
+
+    if (!labelForm.name.trim()) {
+      toast.error("Escribe un nombre para el label.");
+      return;
+    }
+
+    try {
+      setIsSaving(true);
+      setError(null);
+      await createLabel(token, toLabelPayload(labelForm, project.project_id));
+      setLabels(await fetchLabels(token, project.project_id));
+      toast.success("Label creado.");
+      closeModal();
+    } catch (saveError) {
+      toast.error(saveError instanceof Error ? saveError.message : "No fue posible crear el label.");
+    } finally {
+      setIsSaving(false);
+    }
+  }
+
   return (
     <>
       <section className="dashboard-content">
@@ -1175,6 +1228,39 @@ export default function ProjectDetail({ params }: { params: { projectId: string 
             </section>
 
             <section className="module-grid">
+              <ModuleCard
+                action={
+                  <button
+                    className="secondary-button"
+                    onClick={() => {
+                      setLabelForm(EMPTY_LABEL_FORM);
+                      setModal("label-create");
+                    }}
+                    type="button"
+                  >
+                    Crear label
+                  </button>
+                }
+                description="Etiquetas disponibles para issues del proyecto."
+                title="Labels"
+              >
+                {labels.length === 0 ? (
+                  <p className="muted-copy">Sin labels.</p>
+                ) : (
+                  <div className="chip-row">
+                    {labels.map((label) => (
+                      <span
+                        className="label-chip"
+                        key={label.label_id}
+                        style={label.color ? { borderColor: label.color, color: label.color } : undefined}
+                      >
+                        {label.name}
+                      </span>
+                    ))}
+                  </div>
+                )}
+              </ModuleCard>
+
               <ModuleCard
                 action={
                   <button
@@ -1650,6 +1736,35 @@ export default function ProjectDetail({ params }: { params: { projectId: string 
               </button>
             </div>
           </div>
+        </Modal>
+      ) : null}
+
+      {modal === "label-create" ? (
+        <Modal onClose={closeModal} title="Crear label">
+          <form className="stack-form" onSubmit={handleSaveLabel}>
+            <label className="field">
+              <span>Nombre</span>
+              <input
+                required
+                type="text"
+                value={labelForm.name}
+                onChange={(event) => setLabelForm((current) => ({ ...current, name: event.target.value }))}
+              />
+            </label>
+            <GradientColorPicker
+              label="Color"
+              value={labelForm.color}
+              onChange={(color) => setLabelForm((current) => ({ ...current, color }))}
+            />
+            <div className="confirm-actions">
+              <button className="secondary-button" onClick={closeModal} type="button">
+                Cancelar
+              </button>
+              <button className="primary-button" disabled={isSaving} type="submit">
+                {isSaving ? "Creando..." : "Crear label"}
+              </button>
+            </div>
+          </form>
         </Modal>
       ) : null}
     </>

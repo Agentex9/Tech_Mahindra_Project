@@ -1,8 +1,11 @@
 import { useEffect, useMemo, useState } from "react";
+import { Link } from "react-router";
 
 import { Modal } from "../components/modal";
+import { GradientColorPicker } from "../components/gradient-color-picker";
 import { useToast } from "../components/toast-provider";
 import {
+  createLabel,
   createIssue,
   fetchIssues,
   fetchLabels,
@@ -11,6 +14,7 @@ import {
   type Issue,
   type IssuePayload,
   type Label,
+  type LabelPayload,
   type Project,
 } from "../lib/api";
 import { isDeveloper } from "../lib/auth";
@@ -50,6 +54,18 @@ const EMPTY_FORM: IssueCreateFormState = {
 const PRIORITY_OPTIONS = ["Low", "Medium", "High", "Critical"];
 const ASSIGNMENT_TYPE_OPTIONS = ["Manual", "Bidding"];
 
+type LabelCreateFormState = {
+  color: string;
+  name: string;
+  project: string;
+};
+
+const EMPTY_LABEL_FORM: LabelCreateFormState = {
+  color: "#D0343E",
+  name: "",
+  project: "",
+};
+
 function toPayload(form: IssueCreateFormState, userId: number): IssuePayload {
   return {
     assigned_to: form.assignedMode === "me" ? userId : null,
@@ -67,6 +83,14 @@ function toPayload(form: IssueCreateFormState, userId: number): IssuePayload {
   };
 }
 
+function toLabelPayload(form: LabelCreateFormState): LabelPayload {
+  return {
+    color: form.color.trim() ? form.color.trim().toUpperCase() : null,
+    name: form.name.trim(),
+    project: form.project,
+  };
+}
+
 export function meta() {
   return [
     { title: "WorkTrack | Issues" },
@@ -81,11 +105,12 @@ export default function IssuesPage() {
   const [projects, setProjects] = useState<Project[]>([]);
   const [labels, setLabels] = useState<Label[]>([]);
   const [selectedProjectId, setSelectedProjectId] = useState("");
-  const [selectedIssue, setSelectedIssue] = useState<Issue | null>(null);
   const [isCreateOpen, setIsCreateOpen] = useState(false);
+  const [isCreateLabelOpen, setIsCreateLabelOpen] = useState(false);
   const [isLoading, setIsLoading] = useState(true);
   const [isSaving, setIsSaving] = useState(false);
   const [form, setForm] = useState<IssueCreateFormState>(EMPTY_FORM);
+  const [labelForm, setLabelForm] = useState<LabelCreateFormState>(EMPTY_LABEL_FORM);
 
   async function loadIssues() {
     try {
@@ -154,6 +179,28 @@ export default function IssuesPage() {
     }
   }
 
+  async function handleCreateLabel(event: React.FormEvent<HTMLFormElement>) {
+    event.preventDefault();
+
+    if (!labelForm.project || !labelForm.name.trim()) {
+      toast.error("Completa proyecto y nombre.");
+      return;
+    }
+
+    setIsSaving(true);
+    try {
+      await createLabel(token, toLabelPayload(labelForm));
+      toast.success("Label creado.");
+      setLabelForm(EMPTY_LABEL_FORM);
+      setIsCreateLabelOpen(false);
+      setLabels(await fetchLabels(token));
+    } catch (error) {
+      toast.error(error instanceof Error ? error.message : "No fue posible crear el label.");
+    } finally {
+      setIsSaving(false);
+    }
+  }
+
   return (
     <section className="dashboard-content">
       <section className="hero-banner compact">
@@ -165,6 +212,16 @@ export default function IssuesPage() {
         <div className="hero-actions">
           <button className="primary-button" onClick={() => setIsCreateOpen(true)} type="button">
             Nuevo issue
+          </button>
+          <button
+            className="secondary-button"
+            onClick={() => {
+              setLabelForm((current) => ({ ...current, project: selectedProjectId || current.project }));
+              setIsCreateLabelOpen(true);
+            }}
+            type="button"
+          >
+            Crear label
           </button>
         </div>
       </section>
@@ -238,59 +295,14 @@ export default function IssuesPage() {
                 )) : <span className="muted-inline">Sin labels</span>}
               </div>
               <div className="portfolio-card-actions">
-                <button className="secondary-button" onClick={() => setSelectedIssue(issue)} type="button">
+                <Link className="secondary-button" to={`/dashboard/issues/${issue.issue_id}`}>
                   Ver detalle
-                </button>
+                </Link>
               </div>
             </article>
           );
         })}
       </section>
-
-      {selectedIssue ? (
-        <Modal onClose={() => setSelectedIssue(null)} title="Detalle del issue">
-          <div className="stack-form">
-            <div>
-              <h3>{selectedIssue.title}</h3>
-              <p className="muted-copy">{selectedIssue.description || "Sin descripcion."}</p>
-            </div>
-            <dl className="project-facts">
-              <div>
-                <dt>Proyecto</dt>
-                <dd>{resolveProject(selectedIssue.project)?.name || selectedIssue.project}</dd>
-              </div>
-              <div>
-                <dt>Estado</dt>
-                <dd>{selectedIssue.status}</dd>
-              </div>
-              <div>
-                <dt>Tipo de asignacion</dt>
-                <dd>{selectedIssue.assignment_type || "Sin definir"}</dd>
-              </div>
-              <div>
-                <dt>Story points</dt>
-                <dd>{selectedIssue.story_points ?? "N/A"}</dd>
-              </div>
-              <div>
-                <dt>Reward points</dt>
-                <dd>{selectedIssue.reward_points ?? "N/A"}</dd>
-              </div>
-              <div>
-                <dt>Precio</dt>
-                <dd>{selectedIssue.price_points ?? "N/A"}</dd>
-              </div>
-              <div>
-                <dt>Creado</dt>
-                <dd>{formatShortSpanishDateTime(selectedIssue.created_at)}</dd>
-              </div>
-              <div>
-                <dt>Actualizado</dt>
-                <dd>{formatShortSpanishDateTime(selectedIssue.updated_at)}</dd>
-              </div>
-            </dl>
-          </div>
-        </Modal>
-      ) : null}
 
       {isCreateOpen ? (
         <Modal onClose={() => !isSaving && setIsCreateOpen(false)} title="Nuevo issue">
@@ -385,6 +397,50 @@ export default function IssuesPage() {
               </button>
               <button className="primary-button" disabled={isSaving} type="submit">
                 {isSaving ? "Creando..." : "Crear issue"}
+              </button>
+            </div>
+          </form>
+        </Modal>
+      ) : null}
+
+      {isCreateLabelOpen ? (
+        <Modal onClose={() => !isSaving && setIsCreateLabelOpen(false)} title="Crear label">
+          <form className="stack-form" onSubmit={handleCreateLabel}>
+            <label className="field">
+              <span>Proyecto</span>
+              <select
+                required
+                value={labelForm.project}
+                onChange={(event) => setLabelForm((current) => ({ ...current, project: event.target.value }))}
+              >
+                <option value="">Selecciona uno</option>
+                {projects.map((project) => (
+                  <option key={project.project_id} value={project.project_id}>
+                    {project.name}
+                  </option>
+                ))}
+              </select>
+            </label>
+            <label className="field">
+              <span>Nombre</span>
+              <input
+                required
+                type="text"
+                value={labelForm.name}
+                onChange={(event) => setLabelForm((current) => ({ ...current, name: event.target.value }))}
+              />
+            </label>
+            <GradientColorPicker
+              label="Color"
+              value={labelForm.color}
+              onChange={(color) => setLabelForm((current) => ({ ...current, color }))}
+            />
+            <div className="confirm-actions">
+              <button className="secondary-button" onClick={() => setIsCreateLabelOpen(false)} type="button">
+                Cancelar
+              </button>
+              <button className="primary-button" disabled={isSaving} type="submit">
+                {isSaving ? "Creando..." : "Crear label"}
               </button>
             </div>
           </form>

@@ -193,6 +193,19 @@ export type IssueAuction = AuditFields & {
   winner: number | null;
 };
 
+export type IssueComment = AuditFields & {
+  comment_id: string;
+  comment_text: string;
+  issue: string;
+  multimedia_attachments: string | null;
+};
+
+export type IssueCommentPayload = {
+  comment_text: string;
+  issue: string;
+  multimedia_attachments?: string | null;
+};
+
 export type IssueAuctionPayload = {
   end_date: string;
   issue: string;
@@ -341,6 +354,14 @@ function update<T, P>(token: string, path: string, payload: P) {
   });
 }
 
+function patch<T, P>(token: string, path: string, payload: P) {
+  return request<T>(path, {
+    body: JSON.stringify(payload),
+    headers: getHeaders(token, true),
+    method: "PATCH",
+  });
+}
+
 function remove(token: string, path: string) {
   return request<void>(path, {
     headers: getHeaders(token),
@@ -470,6 +491,10 @@ export function fetchIssues(token: string) {
   return list<Issue>(token, "/projects/issues/");
 }
 
+export function fetchIssue(token: string, issueId: string) {
+  return retrieve<Issue>(token, `/projects/issues/${issueId}/`);
+}
+
 export function fetchProjectIssues(token: string, projectId: string) {
   return list<Issue>(token, "/projects/issues/", { project: projectId });
 }
@@ -480,6 +505,10 @@ export function createIssue(token: string, payload: IssuePayload) {
 
 export function updateIssue(token: string, issueId: string, payload: IssuePayload) {
   return update<Issue, IssuePayload>(token, `/projects/issues/${issueId}/`, payload);
+}
+
+export function updateIssueLabels(token: string, issueId: string, labels: string[]) {
+  return patch<Issue, Pick<IssuePayload, "labels">>(token, `/projects/issues/${issueId}/`, { labels });
 }
 
 export function deleteIssue(token: string, issueId: string) {
@@ -500,6 +529,14 @@ export function updateLabel(token: string, labelId: string, payload: LabelPayloa
 
 export function deleteLabel(token: string, labelId: string) {
   return remove(token, `/projects/labels/${labelId}/`);
+}
+
+export function fetchIssueComments(token: string, issueId: string) {
+  return list<IssueComment>(token, "/projects/issue-comments/", { issue: issueId });
+}
+
+export function createIssueComment(token: string, payload: IssueCommentPayload) {
+  return create<IssueComment, IssueCommentPayload>(token, "/projects/issue-comments/", payload);
 }
 
 export function fetchIssueAuctions(token: string, issueId?: string) {

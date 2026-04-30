@@ -1,6 +1,7 @@
 import { useEffect, useState } from "react";
 import { useNavigate } from "react-router";
 
+import { Modal } from "../components/modal";
 import { useToast } from "../components/toast-provider";
 import { clearSession } from "../lib/auth";
 import { fetchMe, fetchSessions, logoutAllRequest, type AuthSession, type AuthUser } from "../lib/api";
@@ -22,6 +23,7 @@ export default function ProfilePage() {
   const [sessions, setSessions] = useState<AuthSession[]>([]);
   const [isLoading, setIsLoading] = useState(true);
   const [isClosingAll, setIsClosingAll] = useState(false);
+  const [isCloseAllModalOpen, setIsCloseAllModalOpen] = useState(false);
 
   async function loadProfile() {
     try {
@@ -54,6 +56,37 @@ export default function ProfilePage() {
 
   return (
     <section className="dashboard-content">
+      {isCloseAllModalOpen ? (
+        <Modal
+          onClose={() => {
+            if (isClosingAll) return;
+            setIsCloseAllModalOpen(false);
+          }}
+          title="Cerrar todas las sesiones"
+        >
+          <div className="content-stack">
+            <p className="subtle-copy">¿Estás seguro de que quieres cerrar todas las sesiones?</p>
+            <div className="confirm-actions">
+              <button
+                className="secondary-button"
+                disabled={isClosingAll}
+                onClick={() => setIsCloseAllModalOpen(false)}
+                type="button"
+              >
+                Cancelar
+              </button>
+              <button
+                className="danger-button"
+                disabled={isClosingAll}
+                onClick={handleCloseAllSessions}
+                type="button"
+              >
+                {isClosingAll ? "Cerrando..." : "Cerrar todas"}
+              </button>
+            </div>
+          </div>
+        </Modal>
+      ) : null}
       <section className="hero-banner compact">
         <div>
           <span className="hero-kicker">Perfil</span>
@@ -61,7 +94,12 @@ export default function ProfilePage() {
           <p className="subtle-copy">Esta seccion usa `/api/auth/me/`, `/api/auth/sessions/` y `/api/auth/logoutall/`.</p>
         </div>
         <div className="hero-actions">
-          <button className="danger-button" disabled={isClosingAll} onClick={handleCloseAllSessions} type="button">
+          <button
+            className="danger-button"
+            disabled={isClosingAll}
+            onClick={() => setIsCloseAllModalOpen(true)}
+            type="button"
+          >
             {isClosingAll ? "Cerrando..." : "Cerrar todas las sesiones"}
           </button>
         </div>
