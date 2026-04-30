@@ -225,6 +225,19 @@ export type AuthSession = {
   user_agent: string;
 };
 
+export type RouletteSpinResponse = {
+  amount: number;
+  balance_after: number;
+  color: "green" | "red" | "black";
+  created_at: string;
+  multiplier: number;
+  option: string;
+  payout: number;
+  result: number;
+  spin_id: string;
+  won: boolean;
+};
+
 function getHeaders(token?: string, hasBody = false) {
   const headers = new Headers();
 
@@ -363,6 +376,10 @@ export function fetchMe(token: string) {
 
 export function fetchSessions(token: string) {
   return list<AuthSession>(token, "/auth/sessions/");
+}
+
+export function spinRoulette(token: string, payload: { amount: number; option: string }) {
+  return create<RouletteSpinResponse, { amount: number; option: string }>(token, "/auth/roulette/spin/", payload);
 }
 
 export function fetchProjects(token: string) {

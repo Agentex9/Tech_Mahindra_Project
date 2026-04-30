@@ -1,4 +1,5 @@
 from django.contrib.auth.signals import user_logged_in, user_logged_out
+from django.db import transaction
 from django.db.models import Q
 from django.utils import timezone
 from drf_spectacular.utils import OpenApiExample, OpenApiRequest, OpenApiResponse, extend_schema
@@ -6,12 +7,21 @@ from knox.auth import TokenAuthentication
 from knox.models import AuthToken
 from knox.settings import knox_settings
 from rest_framework import serializers, status, viewsets
+from rest_framework.decorators import action
 from rest_framework.permissions import AllowAny, IsAuthenticated
 from rest_framework.response import Response
 from rest_framework.serializers import DateTimeField
 
-from .models import AuthSession
-from .serializers import AuthSessionSerializer, LoginSerializer, UserSerializer
+from .models import AuthSession, PointTransaction, RouletteSpin, User
+from .serializers import (
+    AuthSessionSerializer,
+    LoginSerializer,
+    PointTransactionSerializer,
+    RouletteSpinRequestSerializer,
+    RouletteSpinResultSerializer,
+    RouletteSpinSerializer,
+    UserSerializer,
+)
 
 
 def _format_expiry(instance):
@@ -211,3 +221,137 @@ class AuthViewSet(viewsets.GenericViewSet):
 
 
 __all__ = ['AuthViewSet']
+
+
+class RouletteSpinViewSet(viewsets.ReadOnlyModelViewSet):
+    serializer_class = RouletteSpinSerializer
+    authentication_classes = [TokenAuthentication]
+    permission_classes = [IsAuthenticated]
+
+    def get_queryset(self):
+        return RouletteSpin.objects.filter(user=self.request.user).order_by('-created_at')
+
+    def _wheel(self):
+        return [
+            {'value': 0, 'color': 'green'},
+            {'value': 1, 'color': 'red'},
+            {'value': 2, 'color': 'black'},
+            {'value': 3, 'color': 'red'},
+            {'value': 4, 'color': 'black'},
+            {'value': 5, 'color': 'red'},
+            {'value': 6, 'color': 'black'},
+            {'value': 7, 'color': 'red'},
+            {'value': 8, 'color': 'black'},
+            {'value': 9, 'color': 'red'},
+            {'value': 10, 'color': 'black'},
+            {'value': 11, 'color': 'red'},
+            {'value': 12, 'color': 'black'},
+        ]
+
+    def _is_winning(self, option: str, slot: dict) -> bool:
+        value = slot['value']
+        color = slot['color']
+
+        if option == 'red':
+            return color == 'red'
+        if option == 'black':
+            return color == 'black'
+        if option == 'green':
+            return color == 'green'
+        if option == 'even':
+            return value != 0 and value % 2 == 0
+        if option == 'odd':
+            return value % 2 == 1
+        if option == 'low':
+            return 1 <= value <= 6
+        if option == 'high':
+            return 7 <= value <= 12
+        return False
+
+    @extend_schema(
+        request=RouletteSpinRequestSerializer,
+        responses={200: RouletteSpinResultSerializer, 400: OpenApiResponse(description='Apuesta invalida.')},
+        tags=['Roulette'],
+        summary='Girar ruleta',
+        description='Descuenta la apuesta, calcula el resultado y registra la transaccion en el backend.',
+    )
+    @action(detail=False, methods=['post'], url_path='spin')
+    def spin(self, request):
+        import random
+
+        payload = RouletteSpinRequestSerializer(data=request.data)
+        payload.is_valid(raise_exception=True)
+        amount = payload.validated_data['amount']
+        option = payload.validated_data['option']
+
+        with transaction.atomic():
+            user = User.objects.select_for_update().get(pk=request.user.pk)
+
+            if amount > user.points_balance:
+                return Response({'detail': 'No tienes puntos suficientes para esa apuesta.'}, status=status.HTTP_400_BAD_REQUEST)
+
+            wheel = self._wheel()
+            slot = random.choice(wheel)
+            won = self._is_winning(option, slot)
+            multiplier = 14 if option == 'green' else 2
+            payout = amount * multiplier if won else 0
+            balance_after = user.points_balance - amount + payout
+
+            user.points_balance = balance_after
+            user.updated_by = user
+            user.save(update_fields=['points_balance', 'updated_at', 'updated_by'])
+
+            spin = RouletteSpin.objects.create(
+                user=user,
+                points_won=payout,
+                spin_cost=amount,
+                created_by=user,
+                updated_by=user,
+            )
+
+            PointTransaction.objects.create(
+                user=user,
+                points=-amount,
+                type='roulette_spin_cost',
+                issue_id=None,
+                created_by=user,
+                updated_by=user,
+            )
+            if payout:
+                PointTransaction.objects.create(
+                    user=user,
+                    points=payout,
+                    type='roulette_payout',
+                    issue_id=None,
+                    created_by=user,
+                    updated_by=user,
+                )
+
+        result = {
+            'spin_id': spin.spin_id,
+            'amount': amount,
+            'option': option,
+            'result': slot['value'],
+            'color': slot['color'],
+            'won': won,
+            'multiplier': multiplier,
+            'payout': payout,
+            'balance_after': balance_after,
+            'created_at': spin.created_at,
+        }
+        return Response(RouletteSpinResultSerializer(result).data)
+
+
+__all__ += ['RouletteSpinViewSet']
+
+
+class PointTransactionViewSet(viewsets.ReadOnlyModelViewSet):
+    serializer_class = PointTransactionSerializer
+    authentication_classes = [TokenAuthentication]
+    permission_classes = [IsAuthenticated]
+
+    def get_queryset(self):
+        return PointTransaction.objects.filter(user=self.request.user).order_by('-created_at')
+
+
+__all__ += ['PointTransactionViewSet']

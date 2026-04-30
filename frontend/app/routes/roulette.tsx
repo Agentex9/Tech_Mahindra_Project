@@ -2,6 +2,7 @@ import { useEffect, useMemo, useState } from "react";
 
 import { useToast } from "../components/toast-provider";
 import { updateStoredUser } from "../lib/auth";
+import { spinRoulette } from "../lib/api";
 import { useDashboardContext } from "../lib/dashboard";
 
 type RouletteSlot = {
@@ -105,7 +106,7 @@ export function meta() {
 
 export default function RoulettePage() {
   const toast = useToast();
-  const { updateUser, user } = useDashboardContext();
+  const { token, updateUser, user } = useDashboardContext();
   const [selectedOption, setSelectedOption] = useState<BetOption>("red");
   const [betAmount, setBetAmount] = useState("10");
   const [history, setHistory] = useState<RouletteHistoryItem[]>([]);
@@ -153,37 +154,40 @@ export default function RoulettePage() {
       window.setTimeout(() => setCurrentSlot(slot), index * 70);
     }
 
-    window.setTimeout(() => {
-      const finalSlot = WHEEL[Math.floor(Math.random() * WHEEL.length)];
-      const won = isWinningBet(selectedOption, finalSlot);
-      const multiplier = getMultiplier(selectedOption);
-      const payout = won ? amount * multiplier : 0;
-      const nextBalance = user.points_balance - amount + payout;
+    try {
+      const response = await spinRoulette(token, { amount, option: selectedOption });
+      const finalSlot = WHEEL.find((slot) => slot.value === response.result) ?? WHEEL[0];
 
       const entry: RouletteHistoryItem = {
-        amount,
-        balanceAfter: nextBalance,
-        multiplier,
+        amount: response.amount,
+        balanceAfter: response.balance_after,
+        multiplier: response.multiplier,
         option: selectedOption,
-        payout,
-        result: finalSlot.value,
-        timestamp: new Date().toISOString(),
-        won,
+        payout: response.payout,
+        result: response.result,
+        timestamp: response.created_at ?? new Date().toISOString(),
+        won: response.won,
       };
 
-      setCurrentSlot(finalSlot);
-      setSpinResult(entry);
-      setHistory((current) => {
-        const next = [entry, ...current].slice(0, 12);
-        persistHistory(next);
-        return next;
-      });
-      applyBalance(nextBalance);
+      window.setTimeout(() => {
+        setCurrentSlot(finalSlot);
+        setSpinResult(entry);
+        setHistory((current) => {
+          const next = [entry, ...current].slice(0, 12);
+          persistHistory(next);
+          return next;
+        });
+        applyBalance(response.balance_after);
+        toast[response.won ? "success" : "error"](
+          response.won ? `Ganaste ${response.payout} pts.` : `Perdiste ${response.amount} pts.`,
+        );
+        setIsSpinning(false);
+      }, 18 * 70 + 120);
+    } catch (error) {
+      const message = error instanceof Error ? error.message : "No fue posible girar la ruleta.";
+      toast.error(message);
       setIsSpinning(false);
-      toast[won ? "success" : "error"](
-        won ? `Ganaste ${payout} pts.` : `Perdiste ${amount} pts.`,
-      );
-    }, 18 * 70 + 120);
+    }
   }
 
   return (
@@ -191,8 +195,8 @@ export default function RoulettePage() {
       <section className="hero-banner compact">
         <div>
           <span className="hero-kicker">Ruleta</span>
-          <h1>Ruleta de casino con logica completa en frontend.</h1>
-          <p className="subtle-copy">La apuesta descuenta y paga puntos directamente sobre la sesion local del usuario.</p>
+          <h1>Ruleta de casino con logica en backend.</h1>
+          <p className="subtle-copy">La apuesta descuenta y paga puntos directamente sobre tu balance en el servidor.</p>
         </div>
         <div className="hero-actions">
           <div className="simple-badge">{user.points_balance} pts</div>
