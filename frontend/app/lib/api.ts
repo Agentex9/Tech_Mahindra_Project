@@ -27,6 +27,19 @@ export type AuthUser = {
   username: string;
 };
 
+export type ManagedUserPayload = {
+  email: string;
+  first_name: string;
+  is_active: boolean;
+  last_name: string;
+  password?: string;
+  points_balance: number;
+  role: string;
+  username: string;
+};
+
+export type ManagedUserUpdatePayload = Partial<ManagedUserPayload>;
+
 type AuditFields = {
   created_at: string;
   created_by: string | null;
@@ -251,6 +264,49 @@ export type RouletteSpinResponse = {
   won: boolean;
 };
 
+export type AgentContextSnippet = {
+  id?: string;
+  metadata?: Record<string, unknown>;
+  score?: number;
+  text: string;
+  title?: string;
+};
+
+export type AgentProjectStats = {
+  active_auctions: number;
+  active_sprints: number;
+  issues: number;
+  name: string;
+  open_issues: number;
+  project_id: string;
+  risks: number;
+  status: string;
+};
+
+export type AgentWorkspaceStats = {
+  active_auctions: number;
+  active_sprints: number;
+  issues_by_status: Record<string, number>;
+  open_issues: number;
+  project_count: number;
+  project_status_breakdown: Record<string, number>;
+  projects: AgentProjectStats[];
+  total_issues: number;
+  total_risks: number;
+};
+
+export type AgentAnalysisResponse = {
+  answer: string;
+  context_snippets: AgentContextSnippet[];
+  llm_model?: string;
+  llm_provider?: string;
+  mode: "preview" | "llm";
+  question: string;
+  rag_enabled: boolean;
+  stats: AgentWorkspaceStats;
+  warnings: string[];
+};
+
 function getHeaders(token?: string, hasBody = false) {
   const headers = new Headers();
 
@@ -399,8 +455,31 @@ export function fetchSessions(token: string) {
   return list<AuthSession>(token, "/auth/sessions/");
 }
 
+export function fetchUsers(token: string) {
+  return list<AuthUser>(token, "/auth/users/");
+}
+
+export function createUser(token: string, payload: ManagedUserPayload) {
+  return create<AuthUser, ManagedUserPayload>(token, "/auth/users/", payload);
+}
+
+export function updateUserRecord(token: string, userId: number, payload: ManagedUserUpdatePayload) {
+  return patch<AuthUser, ManagedUserUpdatePayload>(token, `/auth/users/${userId}/`, payload);
+}
+
 export function spinRoulette(token: string, payload: { amount: number; option: string }) {
   return create<RouletteSpinResponse, { amount: number; option: string }>(token, "/auth/roulette/spin/", payload);
+}
+
+export function analyzeAgentWorkspace(
+  token: string,
+  payload: { project_id?: string; question: string; top_k?: number },
+) {
+  return create<AgentAnalysisResponse, { project_id?: string; question: string; top_k?: number }>(
+    token,
+    "/agents/analyze/",
+    payload,
+  );
 }
 
 export function fetchProjects(token: string) {

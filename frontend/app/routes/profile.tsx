@@ -140,10 +140,10 @@ export default function ProfilePage() {
           <h2>Sesiones activas</h2>
           {isLoading ? <p className="muted-copy">Cargando sesiones...</p> : null}
           <div className="module-list">
-            {sessions.map((session) => (
+            {sessions.map((session: AuthSession, index: number) => (
               <article className="module-item" key={session.id}>
                 <div className="module-item-head">
-                  <strong>{session.is_current ? "Sesion actual" : `Token ${session.token_key}`}</strong>
+                  <strong>{session.is_current ? "Sesion actual" : `Sesion ${index + 1}`}</strong>
                   <span className="muted-inline">{session.ip_address || "Sin IP"}</span>
                 </div>
                 <div className="module-item-meta">

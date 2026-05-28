@@ -326,46 +326,33 @@ export default function DashboardLayout() {
         </div>
 
         <nav aria-label="Dashboard" className="sidebar-nav">
-          {navItems.flatMap((item) => {
-            const link = (
-              <NavLink
-                key={item.to}
-                className={({ isActive }: { isActive: boolean }) =>
-                  isActive || (item.to === "/dashboard" && currentPath === "/dashboard")
-                    ? "sidebar-link is-active"
-                    : "sidebar-link"
-                }
-                end={item.to === "/dashboard"}
-                to={item.to}
-              >
-                <span className="sidebar-link-icon" aria-hidden="true">
-                  <item.icon className="sidebar-icon" focusable="false" />
-                </span>
-                <strong className="sidebar-link-label">{item.label}</strong>
-              </NavLink>
-            );
-
-            if (item.to !== "/dashboard/profile") return [link];
-
-            const logout = (
-              <button
-                key="sidebar-logout"
-                className="sidebar-link sidebar-action"
-                onClick={handleLogout}
-                type="button"
-              >
-                <span className="sidebar-link-icon" aria-hidden="true">
-                  <DoorArrowIcon className="sidebar-icon" focusable="false" />
-                </span>
-                <strong className="sidebar-link-label">Cerrar sesión</strong>
-              </button>
-            );
-
-            return [link, logout];
-          })}
+          {navItems.map((item) => (
+            <NavLink
+              key={item.to}
+              className={({ isActive }: { isActive: boolean }) =>
+                isActive || (item.to === "/dashboard" && currentPath === "/dashboard")
+                  ? "sidebar-link is-active"
+                  : "sidebar-link"
+              }
+              end={item.to === "/dashboard"}
+              to={item.to}
+            >
+              <span className="sidebar-link-icon" aria-hidden="true">
+                <item.icon className="sidebar-icon" focusable="false" />
+              </span>
+              <strong className="sidebar-link-label">{item.label}</strong>
+            </NavLink>
+          ))}
         </nav>
 
-        <div className="sidebar-footer" />
+        <div className="sidebar-footer">
+          <button className="sidebar-link sidebar-action sidebar-logout-button" onClick={handleLogout} type="button">
+            <span className="sidebar-link-icon" aria-hidden="true">
+              <DoorArrowIcon className="sidebar-icon" focusable="false" />
+            </span>
+            <strong className="sidebar-link-label">Cerrar sesión</strong>
+          </button>
+        </div>
       </aside>
 
       <section className="dashboard-main">

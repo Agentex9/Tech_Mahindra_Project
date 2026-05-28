@@ -6,9 +6,9 @@ from drf_spectacular.utils import OpenApiExample, OpenApiRequest, OpenApiRespons
 from knox.auth import TokenAuthentication
 from knox.models import AuthToken
 from knox.settings import knox_settings
-from rest_framework import serializers, status, viewsets
+from rest_framework import mixins, serializers, status, viewsets
 from rest_framework.decorators import action
-from rest_framework.permissions import AllowAny, IsAuthenticated
+from rest_framework.permissions import AllowAny, BasePermission, IsAuthenticated
 from rest_framework.response import Response
 from rest_framework.serializers import DateTimeField
 
@@ -21,6 +21,7 @@ from .serializers import (
     RouletteSpinResultSerializer,
     RouletteSpinSerializer,
     UserSerializer,
+    UserWriteSerializer,
 )
 
 
@@ -29,6 +30,35 @@ def _format_expiry(instance):
         return None
 
     return DateTimeField(format=knox_settings.EXPIRY_DATETIME_FORMAT).to_representation(instance.expiry)
+
+
+class AdminUserPermission(BasePermission):
+    def has_permission(self, request, view):
+        user = request.user
+        return bool(user and user.is_authenticated and getattr(user, 'is_admin_role', False))
+
+
+class UserViewSet(
+    mixins.ListModelMixin,
+    mixins.CreateModelMixin,
+    mixins.RetrieveModelMixin,
+    mixins.UpdateModelMixin,
+    viewsets.GenericViewSet,
+):
+    queryset = User.objects.all().order_by('id')
+    authentication_classes = [TokenAuthentication]
+    permission_classes = [AdminUserPermission]
+
+    def get_serializer_class(self):
+        if self.action in {'create', 'update', 'partial_update'}:
+            return UserWriteSerializer
+        return UserSerializer
+
+    def perform_create(self, serializer):
+        serializer.save(created_by=self.request.user, updated_by=self.request.user)
+
+    def perform_update(self, serializer):
+        serializer.save(updated_by=self.request.user)
 
 
 class AuthLoginResponseSerializer(serializers.Serializer):
@@ -220,7 +250,7 @@ class AuthViewSet(viewsets.GenericViewSet):
         return Response(serializer.data)
 
 
-__all__ = ['AuthViewSet']
+__all__ = ['UserViewSet', 'AuthViewSet']
 
 
 class RouletteSpinViewSet(viewsets.ReadOnlyModelViewSet):

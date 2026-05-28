@@ -23,6 +23,66 @@ class UserSerializer(serializers.ModelSerializer):
         read_only_fields = fields
 
 
+class UserWriteSerializer(serializers.ModelSerializer):
+    password = serializers.CharField(write_only=True, required=False, allow_blank=False, style={'input_type': 'password'})
+
+    class Meta:
+        model = User
+        fields = (
+            'id',
+            'username',
+            'email',
+            'first_name',
+            'last_name',
+            'role',
+            'points_balance',
+            'is_active',
+            'password',
+        )
+        read_only_fields = ('id',)
+
+    def validate_role(self, value):
+        normalized = User.normalize_role(value)
+        valid_roles = {choice for choice, _label in User.RoleChoices.choices}
+        if normalized not in valid_roles:
+            raise serializers.ValidationError('Rol invalido. Usa Admin, PM o Developer.')
+        return normalized
+
+    def validate_points_balance(self, value):
+        if value < 0:
+            raise serializers.ValidationError('El balance de puntos no puede ser negativo.')
+        return value
+
+    def create(self, validated_data):
+        password = validated_data.pop('password', None)
+        role = validated_data.get('role', User.RoleChoices.DEVELOPER)
+        validated_data['is_staff'] = role == User.RoleChoices.ADMIN
+        user = User(**validated_data)
+        if password:
+            user.set_password(password)
+        else:
+            user.set_unusable_password()
+        user.save()
+        return user
+
+    def update(self, instance, validated_data):
+        password = validated_data.pop('password', None)
+        role = validated_data.get('role', instance.role)
+
+        for field, value in validated_data.items():
+            setattr(instance, field, value)
+
+        instance.role = self.validate_role(role)
+        if not instance.is_superuser:
+            instance.is_staff = instance.role == User.RoleChoices.ADMIN
+
+        if password:
+            instance.set_password(password)
+
+        instance.save()
+        return instance
+
+
 class LoginSerializer(serializers.Serializer):
     username = serializers.CharField(write_only=True)
     password = serializers.CharField(write_only=True, style={'input_type': 'password'})

@@ -113,6 +113,11 @@ export default function RoulettePage() {
   const [currentSlot, setCurrentSlot] = useState<RouletteSlot>(WHEEL[0]);
   const [isSpinning, setIsSpinning] = useState(false);
   const [spinResult, setSpinResult] = useState<RouletteHistoryItem | null>(null);
+  const selectedOptionConfig = BET_OPTIONS.find((option) => option.value === selectedOption) ?? BET_OPTIONS[0];
+  const normalizedBetAmount = Number(betAmount);
+  const potentialPayout = Number.isFinite(normalizedBetAmount) && normalizedBetAmount > 0
+    ? normalizedBetAmount * getMultiplier(selectedOption)
+    : 0;
 
   useEffect(() => {
     setHistory(loadHistory());
@@ -191,20 +196,48 @@ export default function RoulettePage() {
   }
 
   return (
-    <section className="dashboard-content">
-      <section className="hero-banner compact">
+    <section className="dashboard-content roulette-page">
+      <section className="hero-banner compact roulette-hero">
         <div>
           <span className="hero-kicker">Ruleta</span>
           <h1>Ruleta de casino con logica en backend.</h1>
           <p className="subtle-copy">La apuesta descuenta y paga puntos directamente sobre tu balance en el servidor.</p>
         </div>
-        <div className="hero-actions">
+        <div className="hero-actions roulette-hero-actions">
           <div className="simple-badge">{user.points_balance} pts</div>
+          <span className="status-pill roulette-hero-pill">{selectedOptionConfig.label}</span>
         </div>
+      </section>
+
+      <section className="roulette-summary-grid">
+        <article className="roulette-summary-card roulette-summary-card-accent">
+          <span className="simple-label">Balance actual</span>
+          <strong>{user.points_balance} pts</strong>
+          <p className="muted-copy">Disponible para apostar ahora mismo.</p>
+        </article>
+        <article className="roulette-summary-card">
+          <span className="simple-label">Apuesta seleccionada</span>
+          <strong>{selectedOptionConfig.label}</strong>
+          <p className="muted-copy">{selectedOptionConfig.description}</p>
+        </article>
+        <article className="roulette-summary-card">
+          <span className="simple-label">Pago potencial</span>
+          <strong>{potentialPayout > 0 ? `${potentialPayout} pts` : "—"}</strong>
+          <p className="muted-copy">Calculado sobre el monto actual.</p>
+        </article>
       </section>
 
       <section className="roulette-layout">
         <article className="simple-panel roulette-board-panel">
+          <div className="roulette-panel-head">
+            <div>
+              <h2>Mesa</h2>
+              <p className="muted-copy">El resultado final se confirma desde backend.</p>
+            </div>
+            <span className={`status-pill roulette-color-pill roulette-color-pill-${currentSlot.color}`}>
+              Casilla {currentSlot.label}
+            </span>
+          </div>
           <div className="roulette-wheel-shell">
             <div className={`roulette-wheel roulette-${currentSlot.color}`}>
               <span>{currentSlot.label}</span>
@@ -219,17 +252,34 @@ export default function RoulettePage() {
             ))}
           </div>
           {spinResult ? (
-            <div className={`status ${spinResult.won ? "success" : "error"}`}>
-              Resultado: {spinResult.result}. {spinResult.won ? `Pago ${spinResult.payout} pts.` : "Apuesta perdida."}
+            <div className={`status roulette-result-banner ${spinResult.won ? "success" : "error"}`}>
+              <strong>{spinResult.won ? "Ganaste" : "No cayó tu apuesta"}</strong>
+              <span>
+                Resultado {spinResult.result} · {spinResult.won ? `Pago ${spinResult.payout} pts.` : `Perdiste ${spinResult.amount} pts.`}
+              </span>
             </div>
-          ) : null}
+          ) : (
+            <div className="roulette-result-placeholder">
+              <span className="muted-copy">Haz un giro para ver aquí el resultado de la ronda.</span>
+            </div>
+          )}
         </article>
 
-        <article className="simple-panel">
+        <article className="simple-panel roulette-bet-panel">
           <div className="panel-header panel-header-start">
             <div>
               <h2>Apuesta</h2>
               <p className="muted-copy">Selecciona la opcion y define el monto.</p>
+            </div>
+          </div>
+          <div className="roulette-selection-card">
+            <div>
+              <span className="simple-label">Seleccion actual</span>
+              <strong>{selectedOptionConfig.label}</strong>
+            </div>
+            <div className="roulette-selection-meta">
+              <span>{selectedOptionConfig.description}</span>
+              <span>x{getMultiplier(selectedOption)}</span>
             </div>
           </div>
           <div className="roulette-options">
@@ -262,7 +312,7 @@ export default function RoulettePage() {
               {isSpinning ? "Girando..." : "Girar ruleta"}
             </button>
           </div>
-          <dl className="project-facts project-facts-single">
+          <dl className="project-facts project-facts-single roulette-facts-grid">
             <div>
               <dt>Balance actual</dt>
               <dd>{user.points_balance} pts</dd>

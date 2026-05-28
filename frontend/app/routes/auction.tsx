@@ -1,21 +1,22 @@
 import { useEffect, useMemo, useState } from "react";
-
 import { Modal } from "../components/modal";
 import { useToast } from "../components/toast-provider";
+import { isPrivilegedUser, updateStoredUser } from "../lib/auth";
 import {
   createIssueAuction,
   createIssueBid,
   fetchIssueAuctions,
   fetchIssueBids,
   fetchIssues,
+  fetchMe,
   updateIssueAuction,
   type Issue,
   type IssueAuction,
   type IssueAuctionPayload,
   type IssueBid,
 } from "../lib/api";
-import { isPrivilegedUser } from "../lib/auth";
 import { useDashboardContext } from "../lib/dashboard";
+
 import { formatShortSpanishDateTime } from "../lib/date";
 
 type AuctionCardData = {
@@ -41,7 +42,7 @@ export function meta() {
 
 export default function AuctionPage() {
   const toast = useToast();
-  const { token, user } = useDashboardContext();
+  const { token, updateUser, user } = useDashboardContext();
   const [issues, setIssues] = useState<Issue[]>([]);
   const [auctions, setAuctions] = useState<IssueAuction[]>([]);
   const [bidsByAuction, setBidsByAuction] = useState<Record<string, IssueBid[]>>({});
@@ -56,7 +57,11 @@ export default function AuctionPage() {
   async function loadAuctionData() {
     setIsLoading(true);
     try {
-      const [issuesPayload, auctionsPayload] = await Promise.all([fetchIssues(token), fetchIssueAuctions(token)]);
+      const [issuesPayload, auctionsPayload, profilePayload] = await Promise.all([
+        fetchIssues(token),
+        fetchIssueAuctions(token),
+        fetchMe(token),
+      ]);
       const bidsEntries = await Promise.all(
         auctionsPayload.map(async (auction) => [auction.auction_id, await fetchIssueBids(token, auction.auction_id)] as const),
       );
@@ -64,6 +69,10 @@ export default function AuctionPage() {
       setIssues(issuesPayload);
       setAuctions(auctionsPayload);
       setBidsByAuction(Object.fromEntries(bidsEntries));
+      const nextUser = updateStoredUser(profilePayload);
+      if (nextUser) {
+        updateUser(nextUser);
+      }
     } catch (error) {
       toast.error(error instanceof Error ? error.message : "No fue posible cargar las subastas.");
     } finally {
@@ -166,8 +175,8 @@ export default function AuctionPage() {
     const topBid = selectedCard.topBid;
     const nextAmount = Number(bidAmount);
 
-    if (!Number.isFinite(nextAmount) || nextAmount <= 0) {
-      toast.error("Escribe una oferta valida.");
+    if (!Number.isFinite(nextAmount) || nextAmount <= 0 || !Number.isInteger(nextAmount)) {
+      toast.error("Escribe una oferta valida en puntos enteros.");
       return;
     }
 
@@ -220,7 +229,7 @@ export default function AuctionPage() {
   }
 
   return (
-    <section className="dashboard-content">
+    <section className="dashboard-content auction-page">
       <section className="hero-banner compact">
         <div>
           <span className="hero-kicker">Subasta</span>
@@ -230,14 +239,14 @@ export default function AuctionPage() {
       </section>
 
       {isPrivilegedUser(user) ? (
-        <section className="simple-panel">
+        <section className="simple-panel auction-create-panel">
           <div className="panel-header panel-header-start">
             <div>
               <h2>Nueva subasta</h2>
               <p className="muted-copy">Crea manualmente una subasta para cualquier issue marcado como bidding.</p>
             </div>
           </div>
-          <div className="form-grid form-grid-3">
+          <div className="form-grid form-grid-3 auction-create-grid">
             <label className="field">
               <span>Issue</span>
               <select value={createIssueId} onChange={(event) => setCreateIssueId(event.target.value)}>
@@ -258,7 +267,7 @@ export default function AuctionPage() {
               <input type="datetime-local" value={createEnd} onChange={(event) => setCreateEnd(event.target.value)} />
             </label>
           </div>
-          <div className="confirm-actions">
+          <div className="confirm-actions auction-create-actions">
             <button className="primary-button" disabled={isSaving} onClick={handleCreateAuction} type="button">
               {isSaving ? "Creando..." : "Crear subasta"}
             </button>
@@ -266,10 +275,10 @@ export default function AuctionPage() {
         </section>
       ) : null}
 
-      <section className="cards-grid issues-grid">
-        {isLoading ? <div className="status muted">Cargando issues en bidding...</div> : null}
+      <section className="cards-grid issues-grid auction-cards-grid">
+        {isLoading ? <div className="status muted auction-status">Cargando issues en bidding...</div> : null}
         {!isLoading && biddingCards.length === 0 ? (
-          <div className="empty-state-card">
+          <div className="empty-state-card auction-empty-state">
             <h3>Sin issues en bidding</h3>
             <p>No hay issues con asignacion por subasta en este momento.</p>
           </div>
@@ -341,7 +350,7 @@ export default function AuctionPage() {
             </p>
             <label className="field">
               <span>Monto</span>
-              <input min="0" step="0.01" type="number" value={bidAmount} onChange={(event) => setBidAmount(event.target.value)} />
+              <input min="0" step="1" type="number" value={bidAmount} onChange={(event) => setBidAmount(event.target.value)} />
             </label>
             <div className="confirm-actions">
               <button className="secondary-button" onClick={() => setSelectedCard(null)} type="button">

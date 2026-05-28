@@ -60,6 +60,7 @@ INSTALLED_APPS = [
     'knox',
     'users',
     'projects',
+    'agents',
 ]
 
 if DEBUG_TOOLBAR_ENABLED:

@@ -1,16 +1,38 @@
+from decimal import Decimal
 
-from rest_framework import viewsets
+from django.db import transaction
+from django.db.models import Max
+from django.utils import timezone
 from drf_spectacular.utils import extend_schema
+from rest_framework import serializers, viewsets
+from rest_framework.permissions import SAFE_METHODS, BasePermission
+
+from users.models import PointTransaction, User
 
 from .models import (
-    Projects, ProjectPlannings, ProjectFinancials, ProjectRisks, 
-    Sprints, Issues, IssueComments, IssueAuctions, IssueBids, Label
-    )
+    IssueAuctions,
+    IssueBids,
+    IssueComments,
+    Issues,
+    Label,
+    ProjectFinancials,
+    ProjectPlannings,
+    ProjectRisks,
+    Projects,
+    Sprints,
+)
 from .serializers import (
-    ProjectSerializer, ProjectPlanningSerializer, 
-    ProjectFinancialSerializer, ProjectRiskSerializer, SprintSerializer, IssueSerializer, 
-    IssueCommentSerializer, IssueAuctionSerializer, IssueBidSerializer, LabelSerializer
-    )
+    IssueAuctionSerializer,
+    IssueBidSerializer,
+    IssueCommentSerializer,
+    IssueSerializer,
+    LabelSerializer,
+    ProjectFinancialSerializer,
+    ProjectPlanningSerializer,
+    ProjectRiskSerializer,
+    ProjectSerializer,
+    SprintSerializer,
+)
 
 
 class QueryFilterMixin:
@@ -27,12 +49,51 @@ class QueryFilterMixin:
         return queryset
 
 
-@extend_schema(tags=["Projects"], summary="Project CRUD operations", description="Create, retrieve, update, and delete projects.")
+class PrivilegedWritePermission(BasePermission):
+    def has_permission(self, request, view):
+        user = request.user
+        if not user or not user.is_authenticated:
+            return False
+        if request.method in SAFE_METHODS:
+            return True
+        return getattr(user, 'is_privileged_role', False)
+
+
+class IssuePermission(BasePermission):
+    def has_permission(self, request, view):
+        user = request.user
+        if not user or not user.is_authenticated:
+            return False
+        if request.method in SAFE_METHODS or request.method == 'POST':
+            return True
+        return getattr(user, 'is_privileged_role', False)
+
+
+class CommentPermission(BasePermission):
+    def has_permission(self, request, view):
+        user = request.user
+        if not user or not user.is_authenticated:
+            return False
+        if request.method in SAFE_METHODS or request.method == 'POST':
+            return True
+        return getattr(user, 'is_privileged_role', False)
+
+
+class BidPermission(BasePermission):
+    def has_permission(self, request, view):
+        user = request.user
+        if not user or not user.is_authenticated:
+            return False
+        if request.method in SAFE_METHODS or request.method == 'POST':
+            return True
+        return getattr(user, 'is_privileged_role', False)
+
+
+@extend_schema(tags=['Projects'], summary='Project CRUD operations', description='Create, retrieve, update, and delete projects.')
 class ProjectViewSet(viewsets.ModelViewSet):
-    queryset = Projects.objects.all().select_related(
-        'project_manager', 'created_by', 'updated_by'
-    )
+    queryset = Projects.objects.all().select_related('project_manager', 'created_by', 'updated_by')
     serializer_class = ProjectSerializer
+    permission_classes = [PrivilegedWritePermission]
 
     def perform_create(self, serializer):
         serializer.save(created_by=self.request.user, updated_by=self.request.user)
@@ -40,12 +101,12 @@ class ProjectViewSet(viewsets.ModelViewSet):
     def perform_update(self, serializer):
         serializer.save(updated_by=self.request.user)
 
-@extend_schema(tags=["Project Planning"], summary="Project Planning CRUD operations", description="Manage project planning details.")
+
+@extend_schema(tags=['Project Planning'], summary='Project Planning CRUD operations', description='Manage project planning details.')
 class ProjectPlanningViewSet(QueryFilterMixin, viewsets.ModelViewSet):
-    queryset = ProjectPlannings.objects.all().select_related(
-        'project', 'created_by', 'updated_by'
-    )
+    queryset = ProjectPlannings.objects.all().select_related('project', 'created_by', 'updated_by')
     serializer_class = ProjectPlanningSerializer
+    permission_classes = [PrivilegedWritePermission]
     filter_mappings = {'project': 'project_id'}
 
     def perform_create(self, serializer):
@@ -54,12 +115,12 @@ class ProjectPlanningViewSet(QueryFilterMixin, viewsets.ModelViewSet):
     def perform_update(self, serializer):
         serializer.save(updated_by=self.request.user)
 
-@extend_schema(tags=["Project Financials"], summary="Project Financial CRUD operations", description="Manage project financial information.")
+
+@extend_schema(tags=['Project Financials'], summary='Project Financial CRUD operations', description='Manage project financial information.')
 class ProjectFinancialViewSet(QueryFilterMixin, viewsets.ModelViewSet):
-    queryset = ProjectFinancials.objects.all().select_related(
-        'project', 'created_by', 'updated_by'
-    )
+    queryset = ProjectFinancials.objects.all().select_related('project', 'created_by', 'updated_by')
     serializer_class = ProjectFinancialSerializer
+    permission_classes = [PrivilegedWritePermission]
     filter_mappings = {'project': 'project_id'}
 
     def perform_create(self, serializer):
@@ -68,12 +129,12 @@ class ProjectFinancialViewSet(QueryFilterMixin, viewsets.ModelViewSet):
     def perform_update(self, serializer):
         serializer.save(updated_by=self.request.user)
 
-@extend_schema(tags=["Project Risks"], summary="Project Risk CRUD operations", description="Manage project risk information.")
+
+@extend_schema(tags=['Project Risks'], summary='Project Risk CRUD operations', description='Manage project risk information.')
 class ProjectRiskViewSet(QueryFilterMixin, viewsets.ModelViewSet):
-    queryset = ProjectRisks.objects.all().select_related(
-        'project', 'created_by', 'updated_by'
-    )
+    queryset = ProjectRisks.objects.all().select_related('project', 'created_by', 'updated_by')
     serializer_class = ProjectRiskSerializer
+    permission_classes = [PrivilegedWritePermission]
     filter_mappings = {'project': 'project_id'}
 
     def perform_create(self, serializer):
@@ -82,12 +143,12 @@ class ProjectRiskViewSet(QueryFilterMixin, viewsets.ModelViewSet):
     def perform_update(self, serializer):
         serializer.save(updated_by=self.request.user)
 
-@extend_schema(tags=["Sprints"], summary="Sprint CRUD operations", description="Manage sprints for projects.")
+
+@extend_schema(tags=['Sprints'], summary='Sprint CRUD operations', description='Manage sprints for projects.')
 class SprintViewSet(QueryFilterMixin, viewsets.ModelViewSet):
-    queryset = Sprints.objects.all().select_related(
-        'project', 'created_by', 'updated_by'
-    )
+    queryset = Sprints.objects.all().select_related('project', 'created_by', 'updated_by')
     serializer_class = SprintSerializer
+    permission_classes = [PrivilegedWritePermission]
     filter_mappings = {'project': 'project_id'}
 
     def perform_create(self, serializer):
@@ -96,12 +157,12 @@ class SprintViewSet(QueryFilterMixin, viewsets.ModelViewSet):
     def perform_update(self, serializer):
         serializer.save(updated_by=self.request.user)
 
-@extend_schema(tags=["Issues"], summary="Issue CRUD operations", description="Manage issues within projects.")
+
+@extend_schema(tags=['Issues'], summary='Issue CRUD operations', description='Manage issues within projects.')
 class IssueViewSet(QueryFilterMixin, viewsets.ModelViewSet):
-    queryset = Issues.objects.all().select_related(
-        'project', 'informed_by', 'assigned_to', 'created_by', 'updated_by'
-    )
+    queryset = Issues.objects.all().select_related('project', 'informed_by', 'assigned_to', 'created_by', 'updated_by')
     serializer_class = IssueSerializer
+    permission_classes = [IssuePermission]
     filter_mappings = {'project': 'project_id'}
 
     def perform_create(self, serializer):
@@ -110,12 +171,12 @@ class IssueViewSet(QueryFilterMixin, viewsets.ModelViewSet):
     def perform_update(self, serializer):
         serializer.save(updated_by=self.request.user)
 
-@extend_schema(tags=["Issue Comments"], summary="Issue Comment CRUD operations", description="Manage comments on issues.")
+
+@extend_schema(tags=['Issue Comments'], summary='Issue Comment CRUD operations', description='Manage comments on issues.')
 class IssueCommentViewSet(QueryFilterMixin, viewsets.ModelViewSet):
-    queryset = IssueComments.objects.all().select_related(
-        'issue', 'created_by', 'updated_by'
-    )
+    queryset = IssueComments.objects.all().select_related('issue', 'created_by', 'updated_by')
     serializer_class = IssueCommentSerializer
+    permission_classes = [CommentPermission]
     filter_mappings = {'issue': 'issue_id'}
 
     def perform_create(self, serializer):
@@ -124,40 +185,140 @@ class IssueCommentViewSet(QueryFilterMixin, viewsets.ModelViewSet):
     def perform_update(self, serializer):
         serializer.save(updated_by=self.request.user)
 
-@extend_schema(tags=["Issue Auctions"], summary="Issue Auction CRUD operations", description="Manage auctions for issues.")
+
+@extend_schema(tags=['Issue Auctions'], summary='Issue Auction CRUD operations', description='Manage auctions for issues.')
 class IssueAuctionViewSet(QueryFilterMixin, viewsets.ModelViewSet):
-    queryset = IssueAuctions.objects.all().select_related(
-        'issue', 'created_by', 'updated_by'
-    )
+    queryset = IssueAuctions.objects.all().select_related('issue', 'created_by', 'updated_by', 'winner')
     serializer_class = IssueAuctionSerializer
+    permission_classes = [PrivilegedWritePermission]
     filter_mappings = {'issue': 'issue_id'}
 
+    def _get_top_bid(self, auction):
+        return auction.bids.select_related('bidder').order_by('-bid_amount', '-created_at').first()
+
     def perform_create(self, serializer):
+        issue = serializer.validated_data['issue']
+        if issue.assignment_type != 'Bidding':
+            raise serializers.ValidationError({'issue': 'Solo los issues con assignment_type Bidding pueden entrar a subasta.'})
         serializer.save(created_by=self.request.user, updated_by=self.request.user)
 
     def perform_update(self, serializer):
-        serializer.save(updated_by=self.request.user)
+        with transaction.atomic():
+            auction = IssueAuctions.objects.select_for_update().select_related('issue').get(pk=serializer.instance.pk)
+            issue = Issues.objects.select_for_update().get(pk=auction.issue_id)
+            next_status = serializer.validated_data.get('status', auction.status)
 
-@extend_schema(tags=["Issue Bids"], summary="Issue Bid CRUD operations", description="Manage bids for issue auctions.")
+            if auction.status in {'Completed', 'Cancelled'} and next_status != auction.status:
+                raise serializers.ValidationError({'status': 'No se puede reabrir una subasta finalizada o cancelada.'})
+
+            if next_status == 'Completed' and auction.status != 'Completed':
+                top_bid = self._get_top_bid(auction)
+                winner = top_bid.bidder if top_bid else None
+                serializer.save(updated_by=self.request.user, winner=winner, status='Completed')
+                issue.assigned_to = winner
+                issue.updated_by = self.request.user
+                issue.save(update_fields=['assigned_to', 'updated_at', 'updated_by'])
+                return
+
+            if next_status == 'Cancelled' and auction.status != 'Cancelled':
+                top_bid = self._get_top_bid(auction)
+                if top_bid and top_bid.bidder_id:
+                    highest_bidder = User.objects.select_for_update().get(pk=top_bid.bidder_id)
+                    released_points = int(top_bid.bid_amount)
+                    highest_bidder.points_balance += released_points
+                    highest_bidder.updated_by = self.request.user
+                    highest_bidder.save(update_fields=['points_balance', 'updated_at', 'updated_by'])
+                    PointTransaction.objects.create(
+                        user=highest_bidder,
+                        points=released_points,
+                        type='auction_bid_release',
+                        issue_id=auction.issue,
+                        created_by=self.request.user,
+                        updated_by=self.request.user,
+                    )
+                serializer.save(updated_by=self.request.user, winner=None, status='Cancelled')
+                return
+
+            serializer.save(updated_by=self.request.user)
+
+
+@extend_schema(tags=['Issue Bids'], summary='Issue Bid CRUD operations', description='Manage bids for issue auctions.')
 class IssueBidViewSet(QueryFilterMixin, viewsets.ModelViewSet):
-    queryset = IssueBids.objects.all().select_related(
-        'auction', 'created_by', 'updated_by'
-    )
+    queryset = IssueBids.objects.all().select_related('auction', 'bidder', 'created_by', 'updated_by')
     serializer_class = IssueBidSerializer
+    permission_classes = [BidPermission]
     filter_mappings = {'auction': 'auction_id'}
 
+    def _get_top_bid(self, auction):
+        return auction.bids.select_related('bidder').order_by('-bid_amount', '-created_at').first()
+
     def perform_create(self, serializer):
-        serializer.save(created_by=self.request.user, updated_by=self.request.user)
+        with transaction.atomic():
+            auction = IssueAuctions.objects.select_for_update().select_related('issue').get(
+                pk=serializer.validated_data['auction'].pk
+            )
+            bid_amount = serializer.validated_data['bid_amount']
+            now = timezone.now()
+            top_bid = self._get_top_bid(auction)
+            bidder = User.objects.select_for_update().get(pk=self.request.user.pk)
+
+            if bid_amount != bid_amount.to_integral_value():
+                raise serializers.ValidationError({'bid_amount': 'Las subastas usan puntos enteros.'})
+            if auction.status != 'In Progress' or now < auction.start_date or now > auction.end_date:
+                raise serializers.ValidationError({'auction': 'La subasta no esta activa.'})
+            if top_bid is not None and bid_amount < top_bid.bid_amount:
+                raise serializers.ValidationError({'bid_amount': 'La oferta no puede ser menor a la mas alta actual.'})
+
+            reserve_delta = int(bid_amount)
+            if top_bid and top_bid.bidder_id == bidder.pk:
+                reserve_delta = int(bid_amount - top_bid.bid_amount)
+
+            if reserve_delta > bidder.points_balance:
+                raise serializers.ValidationError({'bid_amount': 'No tienes puntos suficientes para sostener esa oferta.'})
+
+            if top_bid and top_bid.bidder_id and top_bid.bidder_id != bidder.pk:
+                previous_highest_bidder = User.objects.select_for_update().get(pk=top_bid.bidder_id)
+                released_points = int(top_bid.bid_amount)
+                previous_highest_bidder.points_balance += released_points
+                previous_highest_bidder.updated_by = self.request.user
+                previous_highest_bidder.save(update_fields=['points_balance', 'updated_at', 'updated_by'])
+                PointTransaction.objects.create(
+                    user=previous_highest_bidder,
+                    points=released_points,
+                    type='auction_bid_release',
+                    issue_id=auction.issue,
+                    created_by=self.request.user,
+                    updated_by=self.request.user,
+                )
+
+            if reserve_delta > 0:
+                bidder.points_balance -= reserve_delta
+                bidder.updated_by = self.request.user
+                bidder.save(update_fields=['points_balance', 'updated_at', 'updated_by'])
+                PointTransaction.objects.create(
+                    user=bidder,
+                    points=-reserve_delta,
+                    type='auction_bid_hold',
+                    issue_id=auction.issue,
+                    created_by=self.request.user,
+                    updated_by=self.request.user,
+                )
+
+            serializer.save(
+                bidder=bidder,
+                created_by=self.request.user,
+                updated_by=self.request.user,
+            )
 
     def perform_update(self, serializer):
         serializer.save(updated_by=self.request.user)
 
-@extend_schema(tags=["Labels"], summary="Label CRUD operations", description="Manage labels for issues and projects.")
+
+@extend_schema(tags=['Labels'], summary='Label CRUD operations', description='Manage labels for issues and projects.')
 class LabelViewSet(QueryFilterMixin, viewsets.ModelViewSet):
-    queryset = Label.objects.all().select_related(
-        'created_by', 'updated_by'
-    )
+    queryset = Label.objects.all().select_related('project', 'created_by', 'updated_by')
     serializer_class = LabelSerializer
+    permission_classes = [PrivilegedWritePermission]
     filter_mappings = {'project': 'project_id'}
 
     def perform_create(self, serializer):
@@ -165,5 +326,3 @@ class LabelViewSet(QueryFilterMixin, viewsets.ModelViewSet):
 
     def perform_update(self, serializer):
         serializer.save(updated_by=self.request.user)
-
-
