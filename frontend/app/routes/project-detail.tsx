@@ -1,6 +1,7 @@
-import { useEffect, useState } from "react";
+import { useEffect, useMemo, useState } from "react";
 import { Link, useNavigate } from "react-router";
 
+import { ListControls, paginate } from "../components/list-controls";
 import { Modal } from "../components/modal";
 import { ProjectForm, type ProjectFormState } from "../components/project-form";
 import { useToast } from "../components/toast-provider";
@@ -99,6 +100,8 @@ const EMPTY_PROJECT_FORM: ProjectFormState = {
   client: "",
   description: "",
   name: "",
+  planned_end_date: "",
+  planned_start_date: "",
   project_type: "",
   status: "Not Started",
   managerMode: "me",
@@ -163,11 +166,23 @@ const EMPTY_LABEL_FORM: LabelFormState = {
 const PRIORITY_OPTIONS = ["Low", "Medium", "High", "Critical"];
 const ASSIGNMENT_TYPE_OPTIONS = ["Manual", "Bidding"];
 
+type ModuleListKey = "plannings" | "financials" | "risks" | "sprints" | "issues";
+
+const INITIAL_MODULE_LIST_STATE: Record<ModuleListKey, { page: number; pageSize: number; search: string }> = {
+  financials: { page: 1, pageSize: 6, search: "" },
+  issues: { page: 1, pageSize: 6, search: "" },
+  plannings: { page: 1, pageSize: 6, search: "" },
+  risks: { page: 1, pageSize: 6, search: "" },
+  sprints: { page: 1, pageSize: 6, search: "" },
+};
+
 function toProjectForm(project: Project): ProjectFormState {
   return {
     client: project.client ?? "",
     description: project.description ?? "",
     name: project.name,
+    planned_end_date: "",
+    planned_start_date: "",
     project_type: project.project_type ?? "",
     status: project.status,
     managerMode: project.project_manager === null ? "unassigned" : "me",
@@ -805,6 +820,17 @@ export default function ProjectDetail({ params }: { params: { projectId: string 
   const [isDeleting, setIsDeleting] = useState(false);
   const [error, setError] = useState<string | null>(null);
   const [modal, setModal] = useState<string | null>(null);
+  const [moduleListState, setModuleListState] = useState(INITIAL_MODULE_LIST_STATE);
+
+  function updateModuleList(key: ModuleListKey, patch: Partial<(typeof INITIAL_MODULE_LIST_STATE)[ModuleListKey]>) {
+    setModuleListState((current) => ({
+      ...current,
+      [key]: {
+        ...current[key],
+        ...patch,
+      },
+    }));
+  }
 
   useEffect(() => {
     if (!token) {
@@ -836,7 +862,11 @@ export default function ProjectDetail({ params }: { params: { projectId: string 
         ]);
 
         setProject(projectPayload);
-        setProjectForm(toProjectForm(projectPayload));
+        setProjectForm({
+          ...toProjectForm(projectPayload),
+          planned_end_date: planningPayload[0]?.planned_end_date ?? "",
+          planned_start_date: planningPayload[0]?.planned_start_date ?? "",
+        });
         setPlannings(planningPayload);
         setFinancials(financialPayload);
         setRisks(riskPayload);
@@ -852,6 +882,47 @@ export default function ProjectDetail({ params }: { params: { projectId: string 
 
     void loadAll();
   }, [params.projectId, token]);
+
+  const filteredPlannings = useMemo(() => {
+    const query = moduleListState.plannings.search.trim().toLowerCase();
+    return query
+      ? plannings.filter((planning) => [planning.methodology, planning.scope_statement, planning.planned_start_date, planning.planned_end_date].join(" ").toLowerCase().includes(query))
+      : plannings;
+  }, [moduleListState.plannings.search, plannings]);
+
+  const filteredFinancials = useMemo(() => {
+    const query = moduleListState.financials.search.trim().toLowerCase();
+    return query
+      ? financials.filter((financial) => [financial.billing_model, financial.estimated_budget, financial.estimated_monthly_cost].join(" ").toLowerCase().includes(query))
+      : financials;
+  }, [financials, moduleListState.financials.search]);
+
+  const filteredRisks = useMemo(() => {
+    const query = moduleListState.risks.search.trim().toLowerCase();
+    return query
+      ? risks.filter((risk) => [risk.risk_name, risk.risk_description, risk.complexity_level, risk.external_dependencies].join(" ").toLowerCase().includes(query))
+      : risks;
+  }, [moduleListState.risks.search, risks]);
+
+  const filteredSprints = useMemo(() => {
+    const query = moduleListState.sprints.search.trim().toLowerCase();
+    return query
+      ? sprints.filter((sprint) => [sprint.name, sprint.status, sprint.goals, sprint.start_date, sprint.end_date].join(" ").toLowerCase().includes(query))
+      : sprints;
+  }, [moduleListState.sprints.search, sprints]);
+
+  const filteredIssues = useMemo(() => {
+    const query = moduleListState.issues.search.trim().toLowerCase();
+    return query
+      ? issues.filter((issue) => [issue.title, issue.description, issue.priority, issue.status, issue.issue_type].join(" ").toLowerCase().includes(query))
+      : issues;
+  }, [issues, moduleListState.issues.search]);
+
+  const planningPage = paginate(filteredPlannings, moduleListState.plannings.page, moduleListState.plannings.pageSize);
+  const financialPage = paginate(filteredFinancials, moduleListState.financials.page, moduleListState.financials.pageSize);
+  const riskPage = paginate(filteredRisks, moduleListState.risks.page, moduleListState.risks.pageSize);
+  const sprintPage = paginate(filteredSprints, moduleListState.sprints.page, moduleListState.sprints.pageSize);
+  const issuePage = paginate(filteredIssues, moduleListState.issues.page, moduleListState.issues.pageSize);
 
   function closeModal() {
     if (isSaving || isDeleting) {
@@ -886,9 +957,38 @@ export default function ProjectDetail({ params }: { params: { projectId: string 
     try {
       setIsSaving(true);
       setError(null);
+      if (!projectForm.planned_start_date || !projectForm.planned_end_date) {
+        toast.error("Completa fecha de inicio y fecha de fin.");
+        return;
+      }
+      if (projectForm.planned_end_date < projectForm.planned_start_date) {
+        toast.error("La fecha de fin no puede ser anterior a la fecha de inicio.");
+        return;
+      }
+
       const updatedProject = await updateProject(token, project.project_id, toProjectPayload(projectForm, user));
+      const primaryPlanning = plannings[0];
+      const planningPayload = {
+        estimated_sprint_count: primaryPlanning?.estimated_sprint_count ?? 1,
+        methodology: primaryPlanning?.methodology ?? null,
+        planned_end_date: projectForm.planned_end_date,
+        planned_start_date: projectForm.planned_start_date,
+        project: project.project_id,
+        scope_statement: primaryPlanning?.scope_statement ?? (projectForm.description.trim() || null),
+      };
+      if (primaryPlanning) {
+        await updateProjectPlanning(token, primaryPlanning.planning_id, planningPayload);
+      } else {
+        await createProjectPlanning(token, planningPayload);
+      }
+      const updatedPlannings = await fetchProjectPlannings(token, project.project_id);
       setProject(updatedProject);
-      setProjectForm(toProjectForm(updatedProject));
+      setPlannings(updatedPlannings);
+      setProjectForm({
+        ...toProjectForm(updatedProject),
+        planned_end_date: updatedPlannings[0]?.planned_end_date ?? "",
+        planned_start_date: updatedPlannings[0]?.planned_start_date ?? "",
+      });
       toast.success("Proyecto actualizado.");
       setModal(null);
     } catch (saveError) {
@@ -1278,11 +1378,24 @@ export default function ProjectDetail({ params }: { params: { projectId: string 
                 description="Fechas, metodologia y alcance."
                 title="Planeacion"
               >
-                {plannings.length === 0 ? (
+                <ListControls
+                  end={planningPage.end}
+                  label="planeaciones"
+                  page={planningPage.page}
+                  pageSize={moduleListState.plannings.pageSize}
+                  search={moduleListState.plannings.search}
+                  searchPlaceholder="Buscar por metodologia, alcance o fecha"
+                  start={planningPage.start}
+                  total={filteredPlannings.length}
+                  onPageChange={(page) => updateModuleList("plannings", { page })}
+                  onPageSizeChange={(pageSize) => updateModuleList("plannings", { page: 1, pageSize })}
+                  onSearchChange={(search) => updateModuleList("plannings", { page: 1, search })}
+                />
+                {filteredPlannings.length === 0 ? (
                   <p className="muted-copy">Sin registros.</p>
                 ) : (
                   <div className="module-list">
-                    {plannings.map((planning) => (
+                    {planningPage.items.map((planning) => (
                       <article className="module-item" key={planning.planning_id}>
                         <div className="module-item-head">
                           <strong>
@@ -1339,11 +1452,24 @@ export default function ProjectDetail({ params }: { params: { projectId: string 
                 description="Presupuesto, costo mensual y modelo de cobro."
                 title="Finanzas"
               >
-                {financials.length === 0 ? (
+                <ListControls
+                  end={financialPage.end}
+                  label="registros financieros"
+                  page={financialPage.page}
+                  pageSize={moduleListState.financials.pageSize}
+                  search={moduleListState.financials.search}
+                  searchPlaceholder="Buscar por presupuesto, costo o modelo"
+                  start={financialPage.start}
+                  total={filteredFinancials.length}
+                  onPageChange={(page) => updateModuleList("financials", { page })}
+                  onPageSizeChange={(pageSize) => updateModuleList("financials", { page: 1, pageSize })}
+                  onSearchChange={(search) => updateModuleList("financials", { page: 1, search })}
+                />
+                {filteredFinancials.length === 0 ? (
                   <p className="muted-copy">Sin registros.</p>
                 ) : (
                   <div className="module-list">
-                    {financials.map((financial) => (
+                    {financialPage.items.map((financial) => (
                       <article className="module-item" key={financial.financial_id}>
                         <div className="module-item-head">
                           <strong>${financial.estimated_budget}</strong>
@@ -1398,11 +1524,24 @@ export default function ProjectDetail({ params }: { params: { projectId: string 
                 description="Riesgos y factores de desviacion."
                 title="Riesgos"
               >
-                {risks.length === 0 ? (
+                <ListControls
+                  end={riskPage.end}
+                  label="riesgos"
+                  page={riskPage.page}
+                  pageSize={moduleListState.risks.pageSize}
+                  search={moduleListState.risks.search}
+                  searchPlaceholder="Buscar por riesgo, complejidad o dependencia"
+                  start={riskPage.start}
+                  total={filteredRisks.length}
+                  onPageChange={(page) => updateModuleList("risks", { page })}
+                  onPageSizeChange={(pageSize) => updateModuleList("risks", { page: 1, pageSize })}
+                  onSearchChange={(search) => updateModuleList("risks", { page: 1, search })}
+                />
+                {filteredRisks.length === 0 ? (
                   <p className="muted-copy">Sin registros.</p>
                 ) : (
                   <div className="module-list">
-                    {risks.map((risk) => (
+                    {riskPage.items.map((risk) => (
                       <article className="module-item" key={risk.risk_id}>
                         <div className="module-item-head">
                           <strong>{risk.risk_name}</strong>
@@ -1457,11 +1596,24 @@ export default function ProjectDetail({ params }: { params: { projectId: string 
                 description="Periodos de trabajo y objetivos."
                 title="Sprints"
               >
-                {sprints.length === 0 ? (
+                <ListControls
+                  end={sprintPage.end}
+                  label="sprints"
+                  page={sprintPage.page}
+                  pageSize={moduleListState.sprints.pageSize}
+                  search={moduleListState.sprints.search}
+                  searchPlaceholder="Buscar por sprint, estado, objetivo o fecha"
+                  start={sprintPage.start}
+                  total={filteredSprints.length}
+                  onPageChange={(page) => updateModuleList("sprints", { page })}
+                  onPageSizeChange={(pageSize) => updateModuleList("sprints", { page: 1, pageSize })}
+                  onSearchChange={(search) => updateModuleList("sprints", { page: 1, search })}
+                />
+                {filteredSprints.length === 0 ? (
                   <p className="muted-copy">Sin registros.</p>
                 ) : (
                   <div className="module-list">
-                    {sprints.map((sprint) => (
+                    {sprintPage.items.map((sprint) => (
                       <article className="module-item" key={sprint.sprint_id}>
                         <div className="module-item-head">
                           <strong>{sprint.name}</strong>
@@ -1516,11 +1668,24 @@ export default function ProjectDetail({ params }: { params: { projectId: string 
                 description="Pendientes y trabajo operativo del proyecto."
                 title="Issues"
               >
-                {issues.length === 0 ? (
+                <ListControls
+                  end={issuePage.end}
+                  label="issues"
+                  page={issuePage.page}
+                  pageSize={moduleListState.issues.pageSize}
+                  search={moduleListState.issues.search}
+                  searchPlaceholder="Buscar por issue, prioridad, estado o tipo"
+                  start={issuePage.start}
+                  total={filteredIssues.length}
+                  onPageChange={(page) => updateModuleList("issues", { page })}
+                  onPageSizeChange={(pageSize) => updateModuleList("issues", { page: 1, pageSize })}
+                  onSearchChange={(search) => updateModuleList("issues", { page: 1, search })}
+                />
+                {filteredIssues.length === 0 ? (
                   <p className="muted-copy">Sin registros.</p>
                 ) : (
                   <div className="module-list">
-                    {issues.map((issue) => (
+                    {issuePage.items.map((issue) => (
                       <article className="module-item" key={issue.issue_id}>
                         <div className="module-item-head">
                           <div>

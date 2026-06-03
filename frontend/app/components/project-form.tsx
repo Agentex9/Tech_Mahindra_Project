@@ -4,6 +4,8 @@ export type ProjectFormState = {
   client: string;
   description: string;
   name: string;
+  planned_end_date: string;
+  planned_start_date: string;
   project_type: string;
   status: string;
   managerMode: "me" | "unassigned";
@@ -85,6 +87,29 @@ export function ProjectForm({
             <option value="me">Asignarme</option>
             <option value="unassigned">Sin asignar</option>
           </select>
+        </label>
+      </div>
+
+      <div className="form-grid">
+        <label className="field">
+          <span>Fecha de inicio</span>
+          <input
+            required
+            type="date"
+            value={form.planned_start_date}
+            onChange={(event) => onChange({ ...form, planned_start_date: event.target.value })}
+          />
+        </label>
+
+        <label className="field">
+          <span>Fecha de fin</span>
+          <input
+            min={form.planned_start_date || undefined}
+            required
+            type="date"
+            value={form.planned_end_date}
+            onChange={(event) => onChange({ ...form, planned_end_date: event.target.value })}
+          />
         </label>
       </div>
 

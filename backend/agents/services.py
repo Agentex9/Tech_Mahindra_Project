@@ -33,7 +33,7 @@ class AgentRuntimeConfig:
         if not llm_base_url:
             llm_base_url = 'https://api.openai.com/v1' if llm_provider == 'openai' else 'https://api.anthropic.com/v1'
 
-        embedding_provider = os.getenv('AGENT_EMBEDDING_PROVIDER', 'openai').strip().lower()
+        embedding_provider = os.getenv('AGENT_EMBEDDING_PROVIDER', 'fastembed').strip().lower()
         embedding_base_url = os.getenv('AGENT_EMBEDDING_BASE_URL', '').strip() or 'https://api.openai.com/v1'
         llm_api_key = os.getenv('AGENT_LLM_API_KEY', '').strip()
         embedding_api_key = os.getenv('AGENT_EMBEDDING_API_KEY', '').strip() or llm_api_key
@@ -41,7 +41,7 @@ class AgentRuntimeConfig:
         return cls(
             embedding_api_key=embedding_api_key,
             embedding_base_url=embedding_base_url.rstrip('/'),
-            embedding_model=os.getenv('AGENT_EMBEDDING_MODEL', 'text-embedding-3-small').strip(),
+            embedding_model=os.getenv('AGENT_EMBEDDING_MODEL', 'BAAI/bge-small-en-v1.5').strip(),
             embedding_provider=embedding_provider,
             llm_api_key=llm_api_key,
             llm_base_url=llm_base_url.rstrip('/'),
@@ -59,7 +59,9 @@ class AgentRuntimeConfig:
 
     @property
     def embeddings_ready(self):
-        return self.embedding_provider == 'openai' and bool(self.embedding_api_key and self.embedding_model)
+        if self.embedding_provider == 'openai':
+            return bool(self.embedding_api_key and self.embedding_model)
+        return self.embedding_provider == 'fastembed' and bool(self.embedding_model)
 
     @property
     def qdrant_ready(self):
@@ -253,8 +255,20 @@ class AgentAnalysisService:
         return [snippet for snippet in snippets if snippet['text']]
 
     def _embed_query(self, question: str) -> list[float]:
+        if self.config.embedding_provider == 'fastembed':
+            try:
+                from fastembed import TextEmbedding
+            except ImportError as exc:
+                raise RuntimeError('Falta instalar fastembed para usar embeddings locales.') from exc
+
+            model = TextEmbedding(model_name=self.config.embedding_model)
+            embeddings = list(model.embed([question]))
+            if not embeddings:
+                raise RuntimeError('FastEmbed no devolvio vectores.')
+            return embeddings[0].tolist()
+
         if self.config.embedding_provider != 'openai':
-            raise RuntimeError('Solo se soportan embeddings OpenAI en esta implementacion inicial.')
+            raise RuntimeError(f'Proveedor de embeddings no soportado: {self.config.embedding_provider}.')
 
         response = self._http_post_json(
             f'{self.config.embedding_base_url}/embeddings',

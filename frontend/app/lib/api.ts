@@ -72,6 +72,15 @@ export type ProjectPayload = {
   status: string;
 };
 
+export type ProjectFilters = {
+  client?: string;
+  description?: string;
+  name?: string;
+  project_manager?: number | string | null;
+  project_type?: string;
+  status?: string;
+};
+
 export type ProjectPlanning = AuditFields & {
   estimated_duration: number;
   estimated_sprint_count: number;
@@ -195,6 +204,17 @@ export type IssuePayload = {
   status: string;
   story_points: number | null;
   title: string;
+};
+
+export type IssueFilters = {
+  assigned_to?: number | string | null;
+  assignment_type?: string;
+  description?: string;
+  issue_type?: string;
+  priority?: string;
+  project?: string;
+  status?: string;
+  title?: string;
 };
 
 export type IssueAuction = AuditFields & {
@@ -482,8 +502,8 @@ export function analyzeAgentWorkspace(
   );
 }
 
-export function fetchProjects(token: string) {
-  return list<Project>(token, "/projects/projects/");
+export function fetchProjects(token: string, query?: ProjectFilters) {
+  return list<Project>(token, "/projects/projects/", query);
 }
 
 export function fetchProject(token: string, projectId: string) {
@@ -566,8 +586,8 @@ export function deleteSprint(token: string, sprintId: string) {
   return remove(token, `/projects/sprints/${sprintId}/`);
 }
 
-export function fetchIssues(token: string) {
-  return list<Issue>(token, "/projects/issues/");
+export function fetchIssues(token: string, query?: IssueFilters) {
+  return list<Issue>(token, "/projects/issues/", query);
 }
 
 export function fetchIssue(token: string, issueId: string) {

@@ -1,3 +1,4 @@
+from django.utils import timezone
 from rest_framework import serializers
 
 from .models import (
@@ -66,6 +67,14 @@ class ProjectPlanningSerializer(AuditSerializer):
         start_date = attrs.get('planned_start_date', getattr(self.instance, 'planned_start_date', None))
         end_date = attrs.get('planned_end_date', getattr(self.instance, 'planned_end_date', None))
 
+        if not start_date:
+            raise serializers.ValidationError({
+                'planned_start_date': 'Planned start date is required.'
+            })
+        if not end_date:
+            raise serializers.ValidationError({
+                'planned_end_date': 'Planned end date is required.'
+            })
         if start_date and end_date and end_date < start_date:
             raise serializers.ValidationError({
                 'planned_end_date': 'Planned end date cannot be before planned start date.'
@@ -153,8 +162,9 @@ class IssueSerializer(AuditSerializer):
         attrs = super().validate(attrs)
         due_date = attrs.get('due_date', getattr(self.instance, 'due_date', None))
         created_at = getattr(self.instance, 'created_at', None)
+        min_date = created_at.date() if created_at else timezone.localdate()
 
-        if due_date and created_at and due_date < created_at.date():
+        if due_date and due_date < min_date:
             raise serializers.ValidationError({
                 'due_date': 'Due date cannot be before the issue creation date.'
             })

@@ -56,10 +56,9 @@ export default function AgentPage() {
       <section className="hero-banner compact">
         <div>
           <span className="hero-kicker">Agente</span>
-          <h1>Analista con base relacional + RAG para leer stats y detectar riesgos.</h1>
+          <h1>Analista operativo para leer el estado del workspace y detectar riesgos.</h1>
           <p className="subtle-copy">
-            Esta primera implementacion ya consulta un endpoint backend para consolidar stats del workspace y, si configuras proveedor + Qdrant,
-            escalar a analisis con LLM externo.
+            Consulta el estado del portafolio, detecta riesgos y recibe acciones concretas con contexto de proyectos e issues.
           </p>
         </div>
         <div className="hero-actions">
@@ -96,7 +95,7 @@ export default function AgentPage() {
           <div className="panel-header panel-header-start">
             <div>
               <h2>Resultado</h2>
-              <p className="muted-copy">Respuesta del servicio de agentes. Si faltan credenciales LLM, veras modo preview.</p>
+              <p className="muted-copy">El analisis combina metricas del workspace con contexto operativo disponible.</p>
             </div>
           </div>
 
@@ -158,8 +157,8 @@ export default function AgentPage() {
             </div>
           ) : (
             <div className="empty-state-card agent-empty-state">
-              <h3>Implementacion iniciada</h3>
-              <p>Ya existe el endpoint para consolidar stats y dejar lista la integracion con LLM externo + Qdrant.</p>
+              <h3>Sin consulta todavia</h3>
+              <p>Escribe una pregunta para revisar riesgos, bloqueos o prioridades del portafolio.</p>
             </div>
           )}
         </article>

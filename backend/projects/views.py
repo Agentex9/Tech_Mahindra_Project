@@ -37,11 +37,20 @@ from .serializers import (
 
 class QueryFilterMixin:
     filter_mappings = {}
+    search_mappings = {}
 
     def get_queryset(self):
         queryset = super().get_queryset()
 
         for query_param, lookup in self.filter_mappings.items():
+            value = self.request.query_params.get(query_param)
+            if value:
+                if value == 'null':
+                    queryset = queryset.filter(**{f'{lookup}__isnull': True})
+                else:
+                    queryset = queryset.filter(**{lookup: value})
+
+        for query_param, lookup in self.search_mappings.items():
             value = self.request.query_params.get(query_param)
             if value:
                 queryset = queryset.filter(**{lookup: value})
@@ -90,10 +99,20 @@ class BidPermission(BasePermission):
 
 
 @extend_schema(tags=['Projects'], summary='Project CRUD operations', description='Create, retrieve, update, and delete projects.')
-class ProjectViewSet(viewsets.ModelViewSet):
+class ProjectViewSet(QueryFilterMixin, viewsets.ModelViewSet):
     queryset = Projects.objects.all().select_related('project_manager', 'created_by', 'updated_by')
     serializer_class = ProjectSerializer
     permission_classes = [PrivilegedWritePermission]
+    filter_mappings = {
+        'project_manager': 'project_manager_id',
+        'status': 'status',
+    }
+    search_mappings = {
+        'client': 'client__icontains',
+        'description': 'description__icontains',
+        'name': 'name__icontains',
+        'project_type': 'project_type__icontains',
+    }
 
     def perform_create(self, serializer):
         serializer.save(created_by=self.request.user, updated_by=self.request.user)
@@ -163,7 +182,18 @@ class IssueViewSet(QueryFilterMixin, viewsets.ModelViewSet):
     queryset = Issues.objects.all().select_related('project', 'informed_by', 'assigned_to', 'created_by', 'updated_by')
     serializer_class = IssueSerializer
     permission_classes = [IssuePermission]
-    filter_mappings = {'project': 'project_id'}
+    filter_mappings = {
+        'assigned_to': 'assigned_to_id',
+        'assignment_type': 'assignment_type',
+        'priority': 'priority',
+        'project': 'project_id',
+        'status': 'status',
+    }
+    search_mappings = {
+        'description': 'description__icontains',
+        'issue_type': 'issue_type__icontains',
+        'title': 'title__icontains',
+    }
 
     def perform_create(self, serializer):
         serializer.save(created_by=self.request.user, updated_by=self.request.user)

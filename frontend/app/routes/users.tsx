@@ -1,6 +1,7 @@
 import { useEffect, useMemo, useState } from "react";
 
 import { Modal } from "../components/modal";
+import { ListControls, paginate } from "../components/list-controls";
 import { useToast } from "../components/toast-provider";
 import { isAdmin } from "../lib/auth";
 import { createUser, fetchUsers, updateUserRecord, type AuthUser, type ManagedUserPayload } from "../lib/api";
@@ -31,15 +32,31 @@ const INITIAL_FORM: UserFormState = {
 };
 
 function buildPayload(form: UserFormState): ManagedUserPayload {
-  return {
+  const payload: ManagedUserPayload = {
     email: form.email.trim(),
     first_name: form.first_name.trim(),
     is_active: form.is_active,
     last_name: form.last_name.trim(),
-    password: form.password,
     points_balance: Number(form.points_balance || "0"),
     role: form.role,
     username: form.username.trim(),
+  };
+  if (form.password) {
+    payload.password = form.password;
+  }
+  return payload;
+}
+
+function toForm(user: AuthUser): UserFormState {
+  return {
+    email: user.email,
+    first_name: user.first_name,
+    is_active: user.is_active,
+    last_name: user.last_name,
+    password: "",
+    points_balance: String(user.points_balance),
+    role: user.role,
+    username: user.username,
   };
 }
 
@@ -59,11 +76,39 @@ export default function UsersPage() {
   const [isCreateOpen, setIsCreateOpen] = useState(false);
   const [form, setForm] = useState<UserFormState>(INITIAL_FORM);
   const [editingUser, setEditingUser] = useState<AuthUser | null>(null);
+  const [pointDrafts, setPointDrafts] = useState<Record<number, string>>({});
+  const [search, setSearch] = useState("");
+  const [page, setPage] = useState(1);
+  const [pageSize, setPageSize] = useState(12);
 
-  const sortedUsers = useMemo(
-    () => [...users].sort((left, right) => left.username.localeCompare(right.username, "es")),
-    [users],
-  );
+  const filteredUsers = useMemo(() => {
+    const normalizedSearch = search.trim().toLowerCase();
+    return [...users]
+      .filter((managedUser) => {
+        if (!normalizedSearch) {
+          return true;
+        }
+        return [
+          managedUser.username,
+          managedUser.email,
+          managedUser.first_name,
+          managedUser.last_name,
+          managedUser.role,
+        ]
+          .join(" ")
+          .toLowerCase()
+          .includes(normalizedSearch);
+      })
+      .sort((left, right) => left.username.localeCompare(right.username, "es"));
+  }, [search, users]);
+
+  const paginatedUsers = useMemo(() => paginate(filteredUsers, page, pageSize), [filteredUsers, page, pageSize]);
+
+  useEffect(() => {
+    if (paginatedUsers.page !== page) {
+      setPage(paginatedUsers.page);
+    }
+  }, [page, paginatedUsers.page]);
 
   async function loadUsers() {
     try {
@@ -110,6 +155,32 @@ export default function UsersPage() {
     }
   }
 
+  async function handleUpdateUser(event: React.FormEvent<HTMLFormElement>) {
+    event.preventDefault();
+    if (!editingUser) {
+      return;
+    }
+
+    const payload = buildPayload(form);
+    if (!payload.username) {
+      toast.error("Username es obligatorio.");
+      return;
+    }
+
+    setIsSaving(true);
+    try {
+      await updateUserRecord(token, editingUser.id, payload);
+      toast.success("Usuario actualizado.");
+      setEditingUser(null);
+      setForm(INITIAL_FORM);
+      await loadUsers();
+    } catch (error) {
+      toast.error(error instanceof Error ? error.message : "No fue posible actualizar el usuario.");
+    } finally {
+      setIsSaving(false);
+    }
+  }
+
   async function handleQuickUpdate(nextUser: AuthUser, partial: Partial<AuthUser>) {
     setIsSaving(true);
     try {
@@ -121,6 +192,24 @@ export default function UsersPage() {
     } finally {
       setIsSaving(false);
     }
+  }
+
+  async function handlePointSave(nextUser: AuthUser) {
+    const rawValue = pointDrafts[nextUser.id] ?? String(nextUser.points_balance);
+    const nextBalance = Number(rawValue || "0");
+    if (!Number.isInteger(nextBalance) || nextBalance < 0) {
+      toast.error("Los puntos deben ser un entero mayor o igual a 0.");
+      return;
+    }
+    if (nextBalance === nextUser.points_balance) {
+      return;
+    }
+    await handleQuickUpdate(nextUser, { points_balance: nextBalance });
+    setPointDrafts((current) => {
+      const next = { ...current };
+      delete next[nextUser.id];
+      return next;
+    });
   }
 
   if (!isAdmin(user)) {
@@ -195,11 +284,70 @@ export default function UsersPage() {
         </Modal>
       ) : null}
 
+      {editingUser ? (
+        <Modal onClose={() => !isSaving && setEditingUser(null)} title={`Administrar ${editingUser.username}`}>
+          <form className="stack-form" onSubmit={handleUpdateUser}>
+            <div className="form-grid form-grid-2">
+              <label className="field">
+                <span>Username</span>
+                <input required type="text" value={form.username} onChange={(event) => setForm((current) => ({ ...current, username: event.target.value }))} />
+              </label>
+              <label className="field">
+                <span>Nueva password</span>
+                <input type="password" value={form.password} onChange={(event) => setForm((current) => ({ ...current, password: event.target.value }))} />
+              </label>
+            </div>
+            <div className="form-grid form-grid-2">
+              <label className="field">
+                <span>Nombre</span>
+                <input type="text" value={form.first_name} onChange={(event) => setForm((current) => ({ ...current, first_name: event.target.value }))} />
+              </label>
+              <label className="field">
+                <span>Apellido</span>
+                <input type="text" value={form.last_name} onChange={(event) => setForm((current) => ({ ...current, last_name: event.target.value }))} />
+              </label>
+            </div>
+            <div className="form-grid form-grid-3">
+              <label className="field">
+                <span>Email</span>
+                <input type="email" value={form.email} onChange={(event) => setForm((current) => ({ ...current, email: event.target.value }))} />
+              </label>
+              <label className="field">
+                <span>Rol</span>
+                <select value={form.role} onChange={(event) => setForm((current) => ({ ...current, role: event.target.value }))}>
+                  {ROLE_OPTIONS.map((role) => (
+                    <option key={role} value={role}>
+                      {role}
+                    </option>
+                  ))}
+                </select>
+              </label>
+              <label className="field">
+                <span>Puntos</span>
+                <input min="0" step="1" type="number" value={form.points_balance} onChange={(event) => setForm((current) => ({ ...current, points_balance: event.target.value }))} />
+              </label>
+            </div>
+            <label className="field-checkbox">
+              <input checked={form.is_active} type="checkbox" onChange={(event) => setForm((current) => ({ ...current, is_active: event.target.checked }))} />
+              <span>Usuario activo</span>
+            </label>
+            <div className="confirm-actions">
+              <button className="secondary-button" onClick={() => setEditingUser(null)} type="button">
+                Cancelar
+              </button>
+              <button className="primary-button" disabled={isSaving} type="submit">
+                {isSaving ? "Guardando..." : "Guardar cambios"}
+              </button>
+            </div>
+          </form>
+        </Modal>
+      ) : null}
+
       <section className="hero-banner compact">
         <div>
           <span className="hero-kicker">Usuarios</span>
-          <h1>Administra usuarios, roles y puntos iniciales.</h1>
-          <p className="subtle-copy">Esta pantalla usa `/api/auth/users/` para listar, crear y actualizar usuarios.</p>
+          <h1>Administra usuarios, roles y puntos.</h1>
+          <p className="subtle-copy">Gestiona accesos, estado de cuenta y balances del equipo desde un solo lugar.</p>
         </div>
         <div className="hero-actions">
           <button
@@ -223,18 +371,44 @@ export default function UsersPage() {
           </div>
         </div>
         {isLoading ? <div className="status muted">Cargando usuarios...</div> : null}
-        {!isLoading && sortedUsers.length === 0 ? (
+        <ListControls
+          end={paginatedUsers.end}
+          label="usuarios"
+          page={paginatedUsers.page}
+          pageSize={pageSize}
+          search={search}
+          searchPlaceholder="Buscar por usuario, correo, nombre o rol"
+          start={paginatedUsers.start}
+          total={filteredUsers.length}
+          onPageChange={setPage}
+          onPageSizeChange={setPageSize}
+          onSearchChange={setSearch}
+        />
+        {!isLoading && filteredUsers.length === 0 ? (
           <div className="empty-state-card">
             <h3>Sin usuarios</h3>
             <p>No hay usuarios registrados.</p>
           </div>
         ) : null}
         <div className="module-list">
-          {sortedUsers.map((managedUser) => (
+          {paginatedUsers.items.map((managedUser) => (
             <article className="module-item" key={managedUser.id}>
               <div className="module-item-head">
-                <strong>{managedUser.username}</strong>
-                <span className="muted-inline">{managedUser.email || "Sin correo"}</span>
+                <div>
+                  <strong>{managedUser.username}</strong>
+                  <span className="muted-inline">{managedUser.email || "Sin correo"}</span>
+                </div>
+                <button
+                  className="ghost-link"
+                  disabled={isSaving}
+                  onClick={() => {
+                    setEditingUser(managedUser);
+                    setForm(toForm(managedUser));
+                  }}
+                  type="button"
+                >
+                  Administrar
+                </button>
               </div>
               <div className="module-item-meta">
                 <span>{managedUser.first_name || managedUser.last_name ? `${managedUser.first_name} ${managedUser.last_name}`.trim() : "Sin nombre"}</span>
@@ -264,20 +438,20 @@ export default function UsersPage() {
                     min="0"
                     step="1"
                     type="number"
-                    value={editingUser?.id === managedUser.id ? editingUser.points_balance : managedUser.points_balance}
-                    onFocus={() => setEditingUser(managedUser)}
+                    value={pointDrafts[managedUser.id] ?? String(managedUser.points_balance)}
                     onChange={(event) =>
-                      setEditingUser((current) => ({ ...(current ?? managedUser), points_balance: Number(event.target.value || "0") }))
+                      setPointDrafts((current) => ({ ...current, [managedUser.id]: event.target.value }))
                     }
-                    onBlur={() => {
-                      const candidate = editingUser?.id === managedUser.id ? editingUser : managedUser;
-                      if (candidate.points_balance !== managedUser.points_balance) {
-                        void handleQuickUpdate(managedUser, { points_balance: candidate.points_balance });
-                      }
-                      setEditingUser(null);
-                    }}
                   />
                 </label>
+                <button
+                  className="secondary-button"
+                  disabled={isSaving || (pointDrafts[managedUser.id] ?? String(managedUser.points_balance)) === String(managedUser.points_balance)}
+                  onClick={() => void handlePointSave(managedUser)}
+                  type="button"
+                >
+                  Guardar puntos
+                </button>
                 <label className="field-checkbox inline-toggle">
                   <input
                     checked={managedUser.is_active}

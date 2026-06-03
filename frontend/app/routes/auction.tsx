@@ -1,5 +1,6 @@
 import { useEffect, useMemo, useState } from "react";
 import { Modal } from "../components/modal";
+import { ListControls, paginate } from "../components/list-controls";
 import { useToast } from "../components/toast-provider";
 import { isPrivilegedUser, updateStoredUser } from "../lib/auth";
 import {
@@ -53,6 +54,9 @@ export default function AuctionPage() {
   const [createIssueId, setCreateIssueId] = useState("");
   const [createStart, setCreateStart] = useState("");
   const [createEnd, setCreateEnd] = useState("");
+  const [search, setSearch] = useState("");
+  const [page, setPage] = useState(1);
+  const [pageSize, setPageSize] = useState(12);
 
   async function loadAuctionData() {
     setIsLoading(true);
@@ -106,6 +110,27 @@ export default function AuctionPage() {
         };
       });
   }, [auctions, bidsByAuction, issues]);
+
+  const filteredBiddingCards = useMemo(() => {
+    const normalizedSearch = search.trim().toLowerCase();
+    if (!normalizedSearch) {
+      return biddingCards;
+    }
+    return biddingCards.filter((card) =>
+      [card.issue.title, card.issue.description, card.issue.priority, card.issue.issue_type, card.auction?.status]
+        .join(" ")
+        .toLowerCase()
+        .includes(normalizedSearch),
+    );
+  }, [biddingCards, search]);
+
+  const paginatedBiddingCards = useMemo(() => paginate(filteredBiddingCards, page, pageSize), [filteredBiddingCards, page, pageSize]);
+
+  useEffect(() => {
+    if (paginatedBiddingCards.page !== page) {
+      setPage(paginatedBiddingCards.page);
+    }
+  }, [page, paginatedBiddingCards.page]);
 
   const bidEligibleIssues = useMemo(() => {
     const issueIdsInAuction = new Set(auctions.map((auction) => auction.issue));
@@ -234,7 +259,7 @@ export default function AuctionPage() {
         <div>
           <span className="hero-kicker">Subasta</span>
           <h1>Issues en bidding y sus ofertas activas.</h1>
-          <p className="subtle-copy">La pantalla ahora parte de los issues con `assignment_type = Bidding`, incluso si la subasta aun no se ha creado.</p>
+          <p className="subtle-copy">Revisa las oportunidades abiertas, ofertas actuales y pendientes de apertura.</p>
         </div>
       </section>
 
@@ -275,15 +300,33 @@ export default function AuctionPage() {
         </section>
       ) : null}
 
+      {!isLoading ? (
+        <section className="simple-panel">
+          <ListControls
+            end={paginatedBiddingCards.end}
+            label="issues en bidding"
+            page={paginatedBiddingCards.page}
+            pageSize={pageSize}
+            search={search}
+            searchPlaceholder="Buscar por issue, prioridad, tipo o estado"
+            start={paginatedBiddingCards.start}
+            total={filteredBiddingCards.length}
+            onPageChange={setPage}
+            onPageSizeChange={setPageSize}
+            onSearchChange={setSearch}
+          />
+        </section>
+      ) : null}
+
       <section className="cards-grid issues-grid auction-cards-grid">
         {isLoading ? <div className="status muted auction-status">Cargando issues en bidding...</div> : null}
-        {!isLoading && biddingCards.length === 0 ? (
+        {!isLoading && filteredBiddingCards.length === 0 ? (
           <div className="empty-state-card auction-empty-state">
             <h3>Sin issues en bidding</h3>
             <p>No hay issues con asignacion por subasta en este momento.</p>
           </div>
         ) : null}
-        {biddingCards.map((card) => (
+        {paginatedBiddingCards.items.map((card) => (
           <article className="portfolio-card issue-card" key={card.issue.issue_id}>
             <div className="portfolio-card-top">
               <span className={`status-pill status-${card.issue.status.toLowerCase().replaceAll(" ", "-")}`}>{card.issue.status}</span>

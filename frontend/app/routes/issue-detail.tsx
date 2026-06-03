@@ -1,6 +1,7 @@
 import { useEffect, useMemo, useState } from "react";
 import { Link, useNavigate } from "react-router";
 
+import { ListControls, paginate } from "../components/list-controls";
 import { useToast } from "../components/toast-provider";
 import {
   createIssueComment,
@@ -28,6 +29,9 @@ export default function IssueDetailPage({ params }: { params: { issueId: string 
   const [comments, setComments] = useState<IssueComment[]>([]);
   const [selectedLabelIds, setSelectedLabelIds] = useState<string[]>([]);
   const [commentText, setCommentText] = useState("");
+  const [commentSearch, setCommentSearch] = useState("");
+  const [commentPage, setCommentPage] = useState(1);
+  const [commentPageSize, setCommentPageSize] = useState(12);
   const [isLoading, setIsLoading] = useState(true);
   const [isSavingLabels, setIsSavingLabels] = useState(false);
   const [isSavingComment, setIsSavingComment] = useState(false);
@@ -60,6 +64,19 @@ export default function IssueDetailPage({ params }: { params: { issueId: string 
     () => selectedLabelIds.map((id) => labelById.get(id)).filter(Boolean) as Label[],
     [labelById, selectedLabelIds]
   );
+  const filteredComments = useMemo(() => {
+    const query = commentSearch.trim().toLowerCase();
+    return query
+      ? comments.filter((comment) => [comment.comment_text, comment.created_by, comment.updated_by].join(" ").toLowerCase().includes(query))
+      : comments;
+  }, [commentSearch, comments]);
+  const paginatedComments = useMemo(() => paginate(filteredComments, commentPage, commentPageSize), [commentPage, commentPageSize, filteredComments]);
+
+  useEffect(() => {
+    if (paginatedComments.page !== commentPage) {
+      setCommentPage(paginatedComments.page);
+    }
+  }, [commentPage, paginatedComments.page]);
 
   function toggleLabel(labelId: string) {
     setSelectedLabelIds((current) =>
@@ -231,9 +248,22 @@ export default function IssueDetailPage({ params }: { params: { issueId: string 
               </div>
             </form>
 
+            <ListControls
+              end={paginatedComments.end}
+              label="comentarios"
+              page={paginatedComments.page}
+              pageSize={commentPageSize}
+              search={commentSearch}
+              searchPlaceholder="Buscar comentarios"
+              start={paginatedComments.start}
+              total={filteredComments.length}
+              onPageChange={setCommentPage}
+              onPageSizeChange={setCommentPageSize}
+              onSearchChange={setCommentSearch}
+            />
             <div className="module-list">
-              {comments.length === 0 ? <p className="muted-copy">Sin comentarios.</p> : null}
-              {comments.map((comment) => (
+              {filteredComments.length === 0 ? <p className="muted-copy">Sin comentarios.</p> : null}
+              {paginatedComments.items.map((comment) => (
                 <article className="module-item" key={comment.comment_id}>
                   <div className="module-item-head">
                     <strong>{comment.created_by || "Usuario"}</strong>

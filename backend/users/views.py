@@ -55,10 +55,32 @@ class UserViewSet(
         return UserSerializer
 
     def perform_create(self, serializer):
-        serializer.save(created_by=self.request.user, updated_by=self.request.user)
+        with transaction.atomic():
+            user = serializer.save(created_by=self.request.user, updated_by=self.request.user)
+            if user.points_balance:
+                PointTransaction.objects.create(
+                    user=user,
+                    points=user.points_balance,
+                    type='admin_initial_grant',
+                    issue_id=None,
+                    created_by=self.request.user,
+                    updated_by=self.request.user,
+                )
 
     def perform_update(self, serializer):
-        serializer.save(updated_by=self.request.user)
+        with transaction.atomic():
+            previous_balance = serializer.instance.points_balance
+            user = serializer.save(updated_by=self.request.user)
+            delta = user.points_balance - previous_balance
+            if delta:
+                PointTransaction.objects.create(
+                    user=user,
+                    points=delta,
+                    type='admin_adjustment',
+                    issue_id=None,
+                    created_by=self.request.user,
+                    updated_by=self.request.user,
+                )
 
 
 class AuthLoginResponseSerializer(serializers.Serializer):

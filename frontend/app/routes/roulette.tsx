@@ -100,7 +100,7 @@ function getMultiplier(option: BetOption) {
 export function meta() {
   return [
     { title: "WorkTrack | Ruleta" },
-    { name: "description", content: "Ruleta de casino en frontend." },
+    { name: "description", content: "Ruleta de puntos." },
   ];
 }
 
@@ -200,7 +200,7 @@ export default function RoulettePage() {
       <section className="hero-banner compact roulette-hero">
         <div>
           <span className="hero-kicker">Ruleta</span>
-          <h1>Ruleta de casino con logica en backend.</h1>
+          <h1>Ruleta de puntos.</h1>
           <p className="subtle-copy">La apuesta descuenta y paga puntos directamente sobre tu balance en el servidor.</p>
         </div>
         <div className="hero-actions roulette-hero-actions">
@@ -232,7 +232,7 @@ export default function RoulettePage() {
           <div className="roulette-panel-head">
             <div>
               <h2>Mesa</h2>
-              <p className="muted-copy">El resultado final se confirma desde backend.</p>
+              <p className="muted-copy">El resultado se registra junto con tu balance de puntos.</p>
             </div>
             <span className={`status-pill roulette-color-pill roulette-color-pill-${currentSlot.color}`}>
               Casilla {currentSlot.label}

@@ -1,10 +1,11 @@
-import { useEffect, useState } from "react";
+import { useEffect, useMemo, useState } from "react";
 import { useNavigate } from "react-router";
 
 import { Modal } from "../components/modal";
 import { useToast } from "../components/toast-provider";
 import { clearSession } from "../lib/auth";
 import { fetchMe, fetchSessions, logoutAllRequest, type AuthSession, type AuthUser } from "../lib/api";
+import { ListControls, paginate } from "../components/list-controls";
 import { useDashboardContext } from "../lib/dashboard";
 import { formatShortSpanishDateTime } from "../lib/date";
 
@@ -21,6 +22,9 @@ export default function ProfilePage() {
   const { token, user } = useDashboardContext();
   const [profile, setProfile] = useState<AuthUser | null>(null);
   const [sessions, setSessions] = useState<AuthSession[]>([]);
+  const [sessionSearch, setSessionSearch] = useState("");
+  const [sessionPage, setSessionPage] = useState(1);
+  const [sessionPageSize, setSessionPageSize] = useState(12);
   const [isLoading, setIsLoading] = useState(true);
   const [isClosingAll, setIsClosingAll] = useState(false);
   const [isCloseAllModalOpen, setIsCloseAllModalOpen] = useState(false);
@@ -39,6 +43,20 @@ export default function ProfilePage() {
   useEffect(() => {
     void loadProfile();
   }, [token]);
+
+  const filteredSessions = useMemo(() => {
+    const query = sessionSearch.trim().toLowerCase();
+    return query
+      ? sessions.filter((session) => [session.user_agent, session.ip_address, session.token_key].join(" ").toLowerCase().includes(query))
+      : sessions;
+  }, [sessionSearch, sessions]);
+  const paginatedSessions = useMemo(() => paginate(filteredSessions, sessionPage, sessionPageSize), [filteredSessions, sessionPage, sessionPageSize]);
+
+  useEffect(() => {
+    if (paginatedSessions.page !== sessionPage) {
+      setSessionPage(paginatedSessions.page);
+    }
+  }, [paginatedSessions.page, sessionPage]);
 
   async function handleCloseAllSessions() {
     setIsClosingAll(true);
@@ -91,7 +109,7 @@ export default function ProfilePage() {
         <div>
           <span className="hero-kicker">Perfil</span>
           <h1>Cuenta, rol y sesiones activas.</h1>
-          <p className="subtle-copy">Esta seccion usa `/api/auth/me/`, `/api/auth/sessions/` y `/api/auth/logoutall/`.</p>
+          <p className="subtle-copy">Revisa tu informacion de cuenta y cierra sesiones que ya no reconozcas.</p>
         </div>
         <div className="hero-actions">
           <button
@@ -139,8 +157,21 @@ export default function ProfilePage() {
         <article className="simple-panel">
           <h2>Sesiones activas</h2>
           {isLoading ? <p className="muted-copy">Cargando sesiones...</p> : null}
+          <ListControls
+            end={paginatedSessions.end}
+            label="sesiones"
+            page={paginatedSessions.page}
+            pageSize={sessionPageSize}
+            search={sessionSearch}
+            searchPlaceholder="Buscar por dispositivo, IP o token"
+            start={paginatedSessions.start}
+            total={filteredSessions.length}
+            onPageChange={setSessionPage}
+            onPageSizeChange={setSessionPageSize}
+            onSearchChange={setSessionSearch}
+          />
           <div className="module-list">
-            {sessions.map((session: AuthSession, index: number) => (
+            {paginatedSessions.items.map((session: AuthSession, index: number) => (
               <article className="module-item" key={session.id}>
                 <div className="module-item-head">
                   <strong>{session.is_current ? "Sesion actual" : `Sesion ${index + 1}`}</strong>

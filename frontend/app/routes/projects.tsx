@@ -1,16 +1,22 @@
 import { useEffect, useMemo, useState } from "react";
 import { Link } from "react-router";
 
+import { ListControls, paginate } from "../components/list-controls";
 import { Modal } from "../components/modal";
 import { ProjectForm, type ProjectFormState } from "../components/project-form";
 import { useToast } from "../components/toast-provider";
 import {
+  createProjectPlanning,
   createProject,
   deleteProject,
+  fetchProjectPlannings,
   fetchProjects,
   PROJECT_STATUSES,
   updateProject,
+  updateProjectPlanning,
   type Project,
+  type ProjectFilters,
+  type ProjectPlanning,
 } from "../lib/api";
 import { useDashboardContext } from "../lib/dashboard";
 
@@ -19,6 +25,8 @@ const EMPTY_FORM: ProjectFormState = {
   description: "",
   managerMode: "me",
   name: "",
+  planned_end_date: "",
+  planned_start_date: "",
   project_type: "",
   status: "Not Started",
 };
@@ -56,6 +64,8 @@ function toForm(project: Project): ProjectFormState {
     description: project.description ?? "",
     managerMode: project.project_manager === null ? "unassigned" : "me",
     name: project.name,
+    planned_end_date: "",
+    planned_start_date: "",
     project_type: project.project_type ?? "",
     status: project.status,
   };
@@ -80,6 +90,7 @@ export default function Projects() {
   const toast = useToast();
   const { token, user } = useDashboardContext();
   const [projects, setProjects] = useState<Project[]>([]);
+  const [planningByProjectId, setPlanningByProjectId] = useState<Record<string, ProjectPlanning | undefined>>({});
   const [filters, setFilters] = useState<FiltersState>(EMPTY_FILTERS);
   const [selectedIds, setSelectedIds] = useState<string[]>([]);
   const [form, setForm] = useState<ProjectFormState>(EMPTY_FORM);
@@ -88,12 +99,30 @@ export default function Projects() {
   const [isLoading, setIsLoading] = useState(true);
   const [isSaving, setIsSaving] = useState(false);
   const [modal, setModal] = useState<"create" | "edit" | "bulk-status" | "bulk-delete" | null>(null);
+  const [page, setPage] = useState(1);
+  const [pageSize, setPageSize] = useState(12);
+
+  function toProjectFilters(): ProjectFilters {
+    return {
+      description: filters.description.trim(),
+      name: filters.name.trim(),
+      project_type: filters.project_type.trim(),
+      status: filters.status,
+    };
+  }
 
   async function loadProjects() {
     setIsLoading(true);
     try {
-      const payload = await fetchProjects(token);
+      const payload = await fetchProjects(token, toProjectFilters());
+      const planningEntries = await Promise.all(
+        payload.map(async (project) => {
+          const plannings = await fetchProjectPlannings(token, project.project_id);
+          return [project.project_id, plannings[0]] as const;
+        }),
+      );
       setProjects(payload);
+      setPlanningByProjectId(Object.fromEntries(planningEntries));
     } finally {
       setIsLoading(false);
     }
@@ -101,24 +130,23 @@ export default function Projects() {
 
   useEffect(() => {
     void loadProjects();
-  }, [token]);
+  }, [token, filters.description, filters.name, filters.project_type, filters.status]);
 
   const filteredProjects = useMemo(() => {
     return projects.filter((project) => {
-      const name = project.name.toLowerCase();
-      const description = (project.description ?? "").toLowerCase();
-      const type = (project.project_type ?? "").toLowerCase();
       const manager = project.project_manager === user.id ? "me" : project.project_manager === null ? "unassigned" : "other";
 
-      return (
-        (!filters.status || project.status === filters.status) &&
-        (!filters.name || name.includes(filters.name.toLowerCase())) &&
-        (!filters.description || description.includes(filters.description.toLowerCase())) &&
-        (!filters.project_type || type.includes(filters.project_type.toLowerCase())) &&
-        (!filters.manager || manager === filters.manager)
-      );
+      return !filters.manager || manager === filters.manager;
     });
   }, [filters, projects, user.id]);
+
+  const paginatedProjects = useMemo(() => paginate(filteredProjects, page, pageSize), [filteredProjects, page, pageSize]);
+
+  useEffect(() => {
+    if (paginatedProjects.page !== page) {
+      setPage(paginatedProjects.page);
+    }
+  }, [page, paginatedProjects.page]);
 
   function toggleSelection(projectId: string) {
     setSelectedIds((current) =>
@@ -133,8 +161,13 @@ export default function Projects() {
 
   async function handleSubmit(event: React.FormEvent<HTMLFormElement>) {
     event.preventDefault();
-    if (!form.name.trim()) {
-      toast.error("Escribe un nombre para el proyecto.");
+    if (!form.name.trim() || !form.planned_start_date || !form.planned_end_date) {
+      toast.error("Completa nombre, fecha de inicio y fecha de fin.");
+      return;
+    }
+
+    if (form.planned_end_date < form.planned_start_date) {
+      toast.error("La fecha de fin no puede ser anterior a la fecha de inicio.");
       return;
     }
 
@@ -142,9 +175,31 @@ export default function Projects() {
     try {
       if (editingProjectId) {
         await updateProject(token, editingProjectId, toPayload(form, user.id));
+        const planning = planningByProjectId[editingProjectId];
+        const planningPayload = {
+          estimated_sprint_count: planning?.estimated_sprint_count ?? 1,
+          methodology: planning?.methodology ?? null,
+          planned_end_date: form.planned_end_date,
+          planned_start_date: form.planned_start_date,
+          project: editingProjectId,
+          scope_statement: planning?.scope_statement ?? (form.description.trim() || null),
+        };
+        if (planning) {
+          await updateProjectPlanning(token, planning.planning_id, planningPayload);
+        } else {
+          await createProjectPlanning(token, planningPayload);
+        }
         toast.success("Proyecto actualizado.");
       } else {
-        await createProject(token, toPayload(form, user.id));
+        const project = await createProject(token, toPayload(form, user.id));
+        await createProjectPlanning(token, {
+          estimated_sprint_count: 1,
+          methodology: null,
+          planned_end_date: form.planned_end_date,
+          planned_start_date: form.planned_start_date,
+          project: project.project_id,
+          scope_statement: form.description.trim() || null,
+        });
         toast.success("Proyecto creado.");
       }
 
@@ -277,6 +332,21 @@ export default function Projects() {
         </div>
       </section>
 
+      {!isLoading ? (
+        <section className="simple-panel">
+          <ListControls
+            end={paginatedProjects.end}
+            label="proyectos"
+            page={paginatedProjects.page}
+            pageSize={pageSize}
+            start={paginatedProjects.start}
+            total={filteredProjects.length}
+            onPageChange={setPage}
+            onPageSizeChange={setPageSize}
+          />
+        </section>
+      ) : null}
+
       <section className="cards-grid">
         {isLoading ? <div className="status muted">Cargando proyectos...</div> : null}
         {!isLoading && filteredProjects.length === 0 ? (
@@ -285,7 +355,7 @@ export default function Projects() {
             <p>No hay proyectos que coincidan con los filtros actuales.</p>
           </div>
         ) : null}
-        {filteredProjects.map((project) => (
+        {paginatedProjects.items.map((project) => (
           <article className="portfolio-card" key={project.project_id}>
             <div className="portfolio-card-top">
               <label className="selection-toggle">
@@ -307,6 +377,14 @@ export default function Projects() {
                 <dt>Responsable</dt>
                 <dd>{project.project_manager === user.id ? "Tu usuario" : project.project_manager === null ? "Sin asignar" : `Usuario #${project.project_manager}`}</dd>
               </div>
+              <div>
+                <dt>Inicio</dt>
+                <dd>{planningByProjectId[project.project_id]?.planned_start_date || "Sin definir"}</dd>
+              </div>
+              <div>
+                <dt>Fin</dt>
+                <dd>{planningByProjectId[project.project_id]?.planned_end_date || "Sin definir"}</dd>
+              </div>
             </dl>
             <div className="portfolio-card-actions">
               <Link className="secondary-button" to={`/dashboard/projects/${project.project_id}`}>
@@ -315,8 +393,13 @@ export default function Projects() {
               <button
                 className="ghost-button"
                 onClick={() => {
+                  const planning = planningByProjectId[project.project_id];
                   setEditingProjectId(project.project_id);
-                  setForm(toForm(project));
+                  setForm({
+                    ...toForm(project),
+                    planned_end_date: planning?.planned_end_date ?? "",
+                    planned_start_date: planning?.planned_start_date ?? "",
+                  });
                   setModal("edit");
                 }}
                 type="button"

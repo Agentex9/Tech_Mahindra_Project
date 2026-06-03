@@ -82,7 +82,7 @@ bun run hooks:run:pre-commit
 Levantar base de datos, backend Django y frontend React Router con hot reload:
 
 ```bash
-docker compose --env-file docker/.env -f docker/docker-compose.dev.yml up --build
+docker compose --env-file .env -f docker/docker-compose.dev.yml up --build
 ```
 
 Servicios:
@@ -90,9 +90,20 @@ Servicios:
 - Frontend: `http://localhost:5173`
 - Backend: `http://localhost:8000`
 - PostgreSQL: `localhost:5432`
+- Qdrant: `http://localhost:6333`
+
+En `.env`, para Docker dev usa `AGENT_QDRANT_URL=http://qdrant:6333`. Si ejecutas Django fuera de Docker, usa `http://localhost:6333`.
+
+Sincronizar datos relacionales hacia Qdrant para el agente RAG:
+
+```bash
+docker compose --env-file .env -f docker/docker-compose.dev.yml exec backend python manage.py sync_qdrant
+```
+
+El agente necesita `AGENT_LLM_API_KEY` para responder con LLM real. Los embeddings RAG usan FastEmbed local por defecto, asi que no necesitan API key.
 
 Para detenerlos:
 
 ```bash
-docker compose --env-file docker/.env -f docker/docker-compose.dev.yml down
+docker compose --env-file .env -f docker/docker-compose.dev.yml down
 ```

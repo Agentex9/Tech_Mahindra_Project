@@ -57,7 +57,7 @@ export default function DashboardHome() {
           <span className="hero-kicker">Resumen ejecutivo</span>
           <h1>Monitorea proyectos, issues y subastas desde un solo flujo.</h1>
           <p className="subtle-copy">
-            La vista principal consolida el portafolio operativo y deja listo el acceso a los tabs con datos reales del backend.
+            La vista principal consolida el portafolio operativo y deja a mano las acciones clave del dia.
           </p>
         </div>
         <div className="hero-actions">
