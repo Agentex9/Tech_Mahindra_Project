@@ -1,0 +1,92 @@
+services:
+  db:
+    image: postgres:17
+    container_name: worktrack_db
+    restart: unless-stopped
+    environment:
+      POSTGRES_DB: ${DB_NAME:-worktrack_db}
+      POSTGRES_USER: ${DB_USER:-worktrack_user}
+      POSTGRES_PASSWORD: ${DB_PASSWORD:-worktrack_password}
+    healthcheck:
+      test: ["CMD-SHELL", "pg_isready -U ${DB_USER:-worktrack_user} -d ${DB_NAME:-worktrack_db}"]
+      interval: 10s
+      timeout: 5s
+      retries: 10
+    volumes:
+      - postgres_data:/var/lib/postgresql/data
+
+  qdrant:
+    image: qdrant/qdrant:v1.15.4
+    container_name: worktrack_qdrant
+    restart: unless-stopped
+    volumes:
+      - qdrant_data:/qdrant/storage
+
+  backend:
+    build:
+      context: ..
+      dockerfile: docker/backend.Dockerfile
+    container_name: worktrack_backend
+    restart: unless-stopped
+    depends_on:
+      db:
+        condition: service_healthy
+      qdrant:
+        condition: service_started
+    environment:
+      SECRET_KEY: ${SECRET_KEY}
+      DEBUG: ${PROD_DEBUG:-False}
+      ALLOWED_HOSTS: ${ALLOWED_HOSTS:-localhost,127.0.0.1,backend}
+      STATIC_URL: ${STATIC_URL:-static/}
+      DB_NAME: ${DB_NAME:-worktrack_db}
+      DB_USER: ${DB_USER:-worktrack_user}
+      DB_PASSWORD: ${DB_PASSWORD:-worktrack_password}
+      DB_HOST: db
+      DB_PORT: 5432
+      AGENT_LLM_PROVIDER: ${AGENT_LLM_PROVIDER:-openai}
+      AGENT_LLM_MODEL: ${AGENT_LLM_MODEL:-gpt-4.1-mini}
+      AGENT_LLM_API_KEY: ${AGENT_LLM_API_KEY:-}
+      AGENT_LLM_BASE_URL: ${AGENT_LLM_BASE_URL:-}
+      AGENT_EMBEDDING_PROVIDER: ${AGENT_EMBEDDING_PROVIDER:-fastembed}
+      AGENT_EMBEDDING_MODEL: ${AGENT_EMBEDDING_MODEL:-BAAI/bge-small-en-v1.5}
+      AGENT_QDRANT_URL: ${AGENT_QDRANT_URL:-http://qdrant:6333}
+      AGENT_QDRANT_COLLECTION: ${AGENT_QDRANT_COLLECTION:-worktrack-knowledge}
+      AGENT_RAG_ENABLED: ${AGENT_RAG_ENABLED:-True}
+    volumes:
+      - ../backend:/app/backend
+      - ../.env:/app/.env:ro
+
+  frontend:
+    build:
+      context: ..
+      dockerfile: docker/frontend.Dockerfile
+    container_name: worktrack_frontend
+    restart: unless-stopped
+    depends_on:
+      - backend
+    environment:
+      HOST: 0.0.0.0
+      PORT: 5173
+      NODE_ENV: production
+      VITE_API_BASE_URL: /api
+    command: sh -c "bun run build && exec bun run start"
+    volumes:
+      - ..:/app
+      - frontend_node_modules:/app/frontend/node_modules
+
+  nginx:
+    image: nginx:1.27-alpine
+    container_name: worktrack_nginx
+    restart: unless-stopped
+    depends_on:
+      - frontend
+      - backend
+    ports:
+      - "80:80"
+    volumes:
+      - ./nginx.prod.conf:/etc/nginx/conf.d/default.conf:ro
+
+volumes:
+  postgres_data:
+  qdrant_data:
+  frontend_node_modules:
