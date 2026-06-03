@@ -37,7 +37,7 @@ services:
     environment:
       SECRET_KEY: ${SECRET_KEY}
       DEBUG: ${PROD_DEBUG:-False}
-      ALLOWED_HOSTS: ${ALLOWED_HOSTS:-localhost,127.0.0.1,backend}
+      ALLOWED_HOSTS: ${ALLOWED_HOSTS:-localhost,127.0.0.1,backend},${PUBLIC_HOST:-98.93.89.166}
       STATIC_URL: ${STATIC_URL:-static/}
       DB_NAME: ${DB_NAME:-worktrack_db}
       DB_USER: ${DB_USER:-worktrack_user}
@@ -72,7 +72,7 @@ services:
     environment:
       SECRET_KEY: ${SECRET_KEY}
       DEBUG: ${PROD_DEBUG:-False}
-      ALLOWED_HOSTS: ${ALLOWED_HOSTS:-localhost,127.0.0.1,backend}
+      ALLOWED_HOSTS: ${ALLOWED_HOSTS:-localhost,127.0.0.1,backend},${PUBLIC_HOST:-98.93.89.166}
       STATIC_URL: ${STATIC_URL:-static/}
       DB_NAME: ${DB_NAME:-worktrack_db}
       DB_USER: ${DB_USER:-worktrack_user}
