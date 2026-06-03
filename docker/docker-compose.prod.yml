@@ -105,7 +105,7 @@ services:
       PORT: 5173
       NODE_ENV: production
       VITE_API_BASE_URL: /api
-    command: sh -c "npm install --include=dev && npm run build && exec npm run start"
+    command: sh -c "npm install --include=dev && npm run build && exec npx vite preview --host 0.0.0.0 --port 5173 --outDir build/client"
     volumes:
       - ..:/app
       - frontend_node_modules:/app/frontend/node_modules
