@@ -2,6 +2,7 @@ from datetime import timedelta
 from decimal import Decimal
 
 from django.contrib.auth import get_user_model
+from django.core.management import call_command
 from django.urls import reverse
 from django.utils import timezone
 from rest_framework import status
@@ -187,7 +188,7 @@ class RoleProtectedProjectAndAuctionApiTests(APITestCase):
         )
 
         self.assertEqual(response.status_code, status.HTTP_201_CREATED)
-        created_bid = IssueBids.objects.latest('created_at')
+        created_bid = IssueBids.objects.exclude(pk=self.top_bid.pk).latest('created_at')
         self.assertEqual(created_bid.bidder_id, self.developer.pk)
         self.assertEqual(created_bid.created_by_id, self.developer.pk)
         self.assertEqual(created_bid.updated_by_id, self.developer.pk)
@@ -234,6 +235,18 @@ class RoleProtectedProjectAndAuctionApiTests(APITestCase):
         self.assertEqual(self.auction.winner_id, self.other_developer.pk)
         self.assertEqual(self.issue.assigned_to_id, self.other_developer.pk)
         self.assertEqual(self.other_developer.points_balance, 85)
+
+    def test_process_expired_auctions_assigns_issue_to_highest_bidder(self):
+        self.auction.end_date = timezone.now() - timedelta(minutes=1)
+        self.auction.save(update_fields=['end_date', 'updated_at'])
+
+        call_command('process_expired_auctions')
+
+        self.auction.refresh_from_db()
+        self.issue.refresh_from_db()
+        self.assertEqual(self.auction.status, 'Completed')
+        self.assertEqual(self.auction.winner_id, self.other_developer.pk)
+        self.assertEqual(self.issue.assigned_to_id, self.other_developer.pk)
 
     def test_developer_cannot_bid_below_current_top_bid(self):
         self.authenticate(self.developer)

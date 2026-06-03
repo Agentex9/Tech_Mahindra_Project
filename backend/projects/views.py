@@ -33,6 +33,7 @@ from .serializers import (
     ProjectSerializer,
     SprintSerializer,
 )
+from .services import complete_auction, get_top_bid
 
 
 class QueryFilterMixin:
@@ -224,7 +225,7 @@ class IssueAuctionViewSet(QueryFilterMixin, viewsets.ModelViewSet):
     filter_mappings = {'issue': 'issue_id'}
 
     def _get_top_bid(self, auction):
-        return auction.bids.select_related('bidder').order_by('-bid_amount', '-created_at').first()
+        return get_top_bid(auction)
 
     def perform_create(self, serializer):
         issue = serializer.validated_data['issue']
@@ -242,12 +243,8 @@ class IssueAuctionViewSet(QueryFilterMixin, viewsets.ModelViewSet):
                 raise serializers.ValidationError({'status': 'No se puede reabrir una subasta finalizada o cancelada.'})
 
             if next_status == 'Completed' and auction.status != 'Completed':
-                top_bid = self._get_top_bid(auction)
-                winner = top_bid.bidder if top_bid else None
-                serializer.save(updated_by=self.request.user, winner=winner, status='Completed')
-                issue.assigned_to = winner
-                issue.updated_by = self.request.user
-                issue.save(update_fields=['assigned_to', 'updated_at', 'updated_by'])
+                completed_auction, _ = complete_auction(auction.pk, updated_by=self.request.user)
+                serializer.instance = completed_auction
                 return
 
             if next_status == 'Cancelled' and auction.status != 'Cancelled':
@@ -280,7 +277,7 @@ class IssueBidViewSet(QueryFilterMixin, viewsets.ModelViewSet):
     filter_mappings = {'auction': 'auction_id'}
 
     def _get_top_bid(self, auction):
-        return auction.bids.select_related('bidder').order_by('-bid_amount', '-created_at').first()
+        return get_top_bid(auction)
 
     def perform_create(self, serializer):
         with transaction.atomic():
