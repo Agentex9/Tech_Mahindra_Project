@@ -432,7 +432,7 @@ code {
 }
 
 .list-controls-with-search {
-  grid-template-columns: minmax(260px, 1fr) auto;
+  grid-template-columns: 1fr;
 }
 
 .list-controls .field {
@@ -442,7 +442,8 @@ code {
 .list-controls-actions {
   align-items: center;
   display: flex;
-  justify-content: flex-end;
+  flex-wrap: wrap;
+  justify-content: space-between;
   gap: var(--space-2);
   min-width: 0;
 }
@@ -745,6 +746,20 @@ code {
   color: var(--color-brand);
   background: var(--color-brand-soft);
   border-color: color-mix(in srgb, var(--color-brand) 35%, var(--color-border));
+}
+
+.status-review {
+  color: #1d4ed8;
+  background: #eff6ff;
+  border-color: #bfdbfe;
+}
+
+@media (prefers-color-scheme: dark) {
+  .status-review {
+    color: #93c5fd;
+    background: #1e3a5f;
+    border-color: #1e40af;
+  }
 }
 
 .error-shell {
@@ -1352,6 +1367,8 @@ code {
 
 .agent-question-input {
   min-height: 10rem;
+  max-height: 20rem;
+  overflow-y: auto;
   resize: vertical;
 }
 
@@ -1605,6 +1622,13 @@ code {
   margin-top: 0;
 }
 
+.roulette-history-scroll {
+  max-height: 420px;
+  overflow-y: auto;
+  display: grid;
+  gap: var(--space-3);
+}
+
 @media (max-width: 900px) {
   .dashboard-shell {
     grid-template-columns: 1fr;
@@ -1657,9 +1681,6 @@ code {
     justify-items: start;
   }
 
-  .list-controls-with-search {
-    grid-template-columns: 1fr;
-  }
 }
 
 @media (max-width: 640px) {

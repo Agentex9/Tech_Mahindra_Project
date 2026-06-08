@@ -333,10 +333,9 @@ export default function RoulettePage() {
         <div className="panel-header panel-header-start">
           <div>
             <h2>Historial reciente</h2>
-            <p className="muted-copy">Ultimos 12 giros guardados localmente.</p>
           </div>
         </div>
-        <div className="module-list">
+        <div className="roulette-history-scroll">
           {history.map((entry) => (
             <article className="module-item" key={entry.timestamp}>
               <div className="module-item-head">
@@ -355,6 +354,7 @@ export default function RoulettePage() {
           {history.length === 0 ? <p className="muted-copy">Todavia no hay giros registrados.</p> : null}
         </div>
       </section>
+
     </section>
   );
 }

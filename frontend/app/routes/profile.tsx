@@ -4,7 +4,7 @@ import { useNavigate } from "react-router";
 import { Modal } from "../components/modal";
 import { useToast } from "../components/toast-provider";
 import { clearSession } from "../lib/auth";
-import { fetchMe, fetchSessions, logoutAllRequest, type AuthSession, type AuthUser } from "../lib/api";
+import { fetchIssues, fetchMe, fetchProjects, fetchSessions, logoutAllRequest, type AuthSession, type AuthUser, type Issue, type Project } from "../lib/api";
 import { ListControls, paginate } from "../components/list-controls";
 import { useDashboardContext } from "../lib/dashboard";
 import { formatShortSpanishDateTime } from "../lib/date";
@@ -22,6 +22,8 @@ export default function ProfilePage() {
   const { token, user } = useDashboardContext();
   const [profile, setProfile] = useState<AuthUser | null>(null);
   const [sessions, setSessions] = useState<AuthSession[]>([]);
+  const [userIssues, setUserIssues] = useState<Issue[]>([]);
+  const [userProjects, setUserProjects] = useState<Project[]>([]);
   const [sessionSearch, setSessionSearch] = useState("");
   const [sessionPage, setSessionPage] = useState(1);
   const [sessionPageSize, setSessionPageSize] = useState(12);
@@ -32,9 +34,18 @@ export default function ProfilePage() {
   async function loadProfile() {
     try {
       setIsLoading(true);
-      const [profilePayload, sessionsPayload] = await Promise.all([fetchMe(token), fetchSessions(token)]);
+      const [profilePayload, sessionsPayload, issuesPayload, projectsPayload] = await Promise.all([
+        fetchMe(token),
+        fetchSessions(token),
+        fetchIssues(token, { assigned_to: user.id }).catch(() => [] as Issue[]),
+        fetchProjects(token, { project_manager: user.id }).catch(() => [] as Project[]),
+      ]);
       setProfile(profilePayload);
       setSessions(sessionsPayload);
+      setUserIssues(issuesPayload);
+      setUserProjects(projectsPayload);
+    } catch (error) {
+      toast.error(error instanceof Error ? error.message : "No fue posible cargar el perfil.");
     } finally {
       setIsLoading(false);
     }
@@ -71,6 +82,11 @@ export default function ProfilePage() {
       setIsClosingAll(false);
     }
   }
+
+  const openIssues = userIssues.filter((i) => i.status !== "Completed" && i.status !== "Cancelled");
+  const reviewIssues = userIssues.filter((i) => i.status === "Review");
+  const completedIssues = userIssues.filter((i) => i.status === "Completed");
+  const activeProjects = userProjects.filter((p) => p.status !== "Completed" && p.status !== "Cancelled");
 
   return (
     <section className="dashboard-content">
@@ -121,6 +137,39 @@ export default function ProfilePage() {
             {isClosingAll ? "Cerrando..." : "Cerrar todas las sesiones"}
           </button>
         </div>
+      </section>
+
+      <section className="roulette-summary-grid">
+        <article className="roulette-summary-card roulette-summary-card-accent">
+          <span className="simple-label">Issues asignados</span>
+          <strong>{userIssues.length}</strong>
+          <p className="muted-copy">Total en todos los estados.</p>
+        </article>
+        <article className="roulette-summary-card">
+          <span className="simple-label">Issues abiertos</span>
+          <strong>{openIssues.length}</strong>
+          <p className="muted-copy">Pendientes de resolver.</p>
+        </article>
+        <article className="roulette-summary-card">
+          <span className="simple-label">En revision</span>
+          <strong>{reviewIssues.length}</strong>
+          <p className="muted-copy">Esperando aprobacion.</p>
+        </article>
+        <article className="roulette-summary-card">
+          <span className="simple-label">Completados</span>
+          <strong>{completedIssues.length}</strong>
+          <p className="muted-copy">Issues cerrados con exito.</p>
+        </article>
+        <article className="roulette-summary-card">
+          <span className="simple-label">Proyectos como PM</span>
+          <strong>{userProjects.length}</strong>
+          <p className="muted-copy">Donde eres responsable.</p>
+        </article>
+        <article className="roulette-summary-card">
+          <span className="simple-label">Proyectos activos</span>
+          <strong>{activeProjects.length}</strong>
+          <p className="muted-copy">Sin cerrar ni cancelar.</p>
+        </article>
       </section>
 
       <section className="detail-grid-page">

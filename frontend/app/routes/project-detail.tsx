@@ -25,12 +25,15 @@ import {
   fetchProjectPlannings,
   fetchProjectRisks,
   fetchProjectSprints,
+  fetchUsers,
+  getIssueStatusOptions,
   updateIssue,
   updateProject,
   updateProjectFinancial,
   updateProjectPlanning,
   updateProjectRisk,
   updateSprint,
+  type AuthUser,
   type Issue,
   type IssuePayload,
   type Label,
@@ -46,7 +49,7 @@ import {
   type SprintPayload,
 } from "../lib/api";
 import { GradientColorPicker } from "../components/gradient-color-picker";
-import type { StoredUser } from "../lib/auth";
+import { isDeveloper } from "../lib/auth";
 import { useDashboardContext } from "../lib/dashboard";
 import { formatShortSpanishDate, formatShortSpanishDateTime } from "../lib/date";
 
@@ -83,7 +86,7 @@ type SprintFormState = {
 };
 
 type IssueFormState = {
-  assignedMode: "me" | "unassigned";
+  assignedId: number | null;
   assignment_type: string;
   description: string;
   due_date: string;
@@ -99,12 +102,12 @@ type IssueFormState = {
 const EMPTY_PROJECT_FORM: ProjectFormState = {
   client: "",
   description: "",
+  managerId: null,
   name: "",
   planned_end_date: "",
   planned_start_date: "",
   project_type: "",
   status: "Not Started",
-  managerMode: "me",
 };
 
 const EMPTY_PLANNING_FORM: PlanningFormState = {
@@ -140,7 +143,7 @@ const EMPTY_SPRINT_FORM: SprintFormState = {
 };
 
 const EMPTY_ISSUE_FORM: IssueFormState = {
-  assignedMode: "unassigned",
+  assignedId: null,
   assignment_type: "",
   description: "",
   due_date: "",
@@ -180,21 +183,21 @@ function toProjectForm(project: Project): ProjectFormState {
   return {
     client: project.client ?? "",
     description: project.description ?? "",
+    managerId: project.project_manager,
     name: project.name,
     planned_end_date: "",
     planned_start_date: "",
     project_type: project.project_type ?? "",
     status: project.status,
-    managerMode: project.project_manager === null ? "unassigned" : "me",
   };
 }
 
-function toProjectPayload(form: ProjectFormState, user: StoredUser) {
+function toProjectPayload(form: ProjectFormState) {
   return {
     client: form.client.trim() || null,
     description: form.description.trim() || null,
     name: form.name.trim(),
-    project_manager: form.managerMode === "me" ? user.id : null,
+    project_manager: form.managerId,
     project_type: form.project_type.trim() || null,
     status: form.status,
   };
@@ -213,7 +216,7 @@ function toPlanningForm(planning: ProjectPlanning): PlanningFormState {
 function toPlanningPayload(form: PlanningFormState, projectId: string): ProjectPlanningPayload {
   return {
     estimated_sprint_count: Number(form.estimated_sprint_count || 0),
-    methodology: form.methodology.trim() || null,
+    methodology: form.methodology.trim(),
     planned_end_date: form.planned_end_date,
     planned_start_date: form.planned_start_date,
     project: projectId,
@@ -286,7 +289,7 @@ function toSprintPayload(form: SprintFormState, projectId: string): SprintPayloa
 
 function toIssueForm(issue: Issue): IssueFormState {
   return {
-    assignedMode: issue.assigned_to === null ? "unassigned" : "me",
+    assignedId: issue.assigned_to,
     assignment_type: issue.assignment_type ?? "",
     description: issue.description ?? "",
     due_date: issue.due_date ?? "",
@@ -300,9 +303,9 @@ function toIssueForm(issue: Issue): IssueFormState {
   };
 }
 
-function toIssuePayload(form: IssueFormState, projectId: string, user: StoredUser): IssuePayload {
+function toIssuePayload(form: IssueFormState, projectId: string): IssuePayload {
   return {
-    assigned_to: form.assignedMode === "me" ? user.id : null,
+    assigned_to: form.assignedId,
     assignment_type: form.assignment_type.trim() || null,
     description: form.description.trim() || null,
     due_date: form.due_date || null,
@@ -641,18 +644,25 @@ function SprintFormView({
 }
 
 function IssueFormView({
+  editingStatus,
   form,
+  isDev,
   isSaving,
   onChange,
   onSubmit,
   submitLabel,
+  users,
 }: {
+  editingStatus?: string;
   form: IssueFormState;
+  isDev?: boolean;
   isSaving: boolean;
   onChange: (next: IssueFormState) => void;
   onSubmit: (event: React.FormEvent<HTMLFormElement>) => void;
   submitLabel: string;
+  users: AuthUser[];
 }) {
+  const statusOptions = getIssueStatusOptions(editingStatus, isDev);
   return (
     <form className="stack-form" onSubmit={onSubmit}>
       <label className="field">
@@ -676,14 +686,13 @@ function IssueFormView({
         <label className="field">
           <span>Estado</span>
           <select
+            disabled={statusOptions.length <= 1}
             value={form.status}
             onChange={(event) => onChange({ ...form, status: event.target.value })}
           >
-            <option value="Not Started">Not Started</option>
-            <option value="In Progress">In Progress</option>
-            <option value="Completed">Completed</option>
-            <option value="On Hold">On Hold</option>
-            <option value="Cancelled">Cancelled</option>
+            {statusOptions.map((status) => (
+              <option key={status} value={status}>{status}</option>
+            ))}
           </select>
         </label>
         <label className="field">
@@ -727,16 +736,23 @@ function IssueFormView({
         <label className="field">
           <span>Responsable</span>
           <select
-            value={form.assignedMode}
+            value={form.assignedId ?? ""}
             onChange={(event) =>
               onChange({
                 ...form,
-                assignedMode: event.target.value as IssueFormState["assignedMode"],
+                assignedId: event.target.value ? Number(event.target.value) : null,
               })
             }
           >
-            <option value="unassigned">Sin asignar</option>
-            <option value="me">Asignarme</option>
+            <option value="">Sin asignar</option>
+            {users.map((u) => {
+              const full = `${u.first_name} ${u.last_name}`.trim();
+              return (
+                <option key={u.id} value={u.id}>
+                  {full || u.username}
+                </option>
+              );
+            })}
           </select>
         </label>
         <label className="field">
@@ -796,7 +812,9 @@ export default function ProjectDetail({ params }: { params: { projectId: string 
   const navigate = useNavigate();
   const toast = useToast();
   const { token, user } = useDashboardContext();
+  const dev = isDeveloper(user);
   const [project, setProject] = useState<Project | null>(null);
+  const [users, setUsers] = useState<AuthUser[]>([]);
   const [projectForm, setProjectForm] = useState<ProjectFormState>(EMPTY_PROJECT_FORM);
   const [plannings, setPlannings] = useState<ProjectPlanning[]>([]);
   const [planningForm, setPlanningForm] = useState<PlanningFormState>(EMPTY_PLANNING_FORM);
@@ -851,6 +869,7 @@ export default function ProjectDetail({ params }: { params: { projectId: string 
           sprintPayload,
           issuePayload,
           labelPayload,
+          usersPayload,
         ] = await Promise.all([
           fetchProject(authToken, params.projectId),
           fetchProjectPlannings(authToken, params.projectId),
@@ -859,9 +878,11 @@ export default function ProjectDetail({ params }: { params: { projectId: string 
           fetchProjectSprints(authToken, params.projectId),
           fetchProjectIssues(authToken, params.projectId),
           fetchLabels(authToken, params.projectId),
+          fetchUsers(authToken).catch(() => [] as AuthUser[]),
         ]);
 
         setProject(projectPayload);
+        setUsers(usersPayload);
         setProjectForm({
           ...toProjectForm(projectPayload),
           planned_end_date: planningPayload[0]?.planned_end_date ?? "",
@@ -966,11 +987,11 @@ export default function ProjectDetail({ params }: { params: { projectId: string 
         return;
       }
 
-      const updatedProject = await updateProject(token, project.project_id, toProjectPayload(projectForm, user));
+      const updatedProject = await updateProject(token, project.project_id, toProjectPayload(projectForm));
       const primaryPlanning = plannings[0];
       const planningPayload = {
         estimated_sprint_count: primaryPlanning?.estimated_sprint_count ?? 1,
-        methodology: primaryPlanning?.methodology ?? null,
+        methodology: primaryPlanning?.methodology ?? "",
         planned_end_date: projectForm.planned_end_date,
         planned_start_date: projectForm.planned_start_date,
         project: project.project_id,
@@ -1203,9 +1224,9 @@ export default function ProjectDetail({ params }: { params: { projectId: string 
       setIsSaving(true);
       setError(null);
       if (editingIssueId) {
-        await updateIssue(token, editingIssueId, toIssuePayload(issueForm, project.project_id, user));
+        await updateIssue(token, editingIssueId, toIssuePayload(issueForm, project.project_id));
       } else {
-        await createIssue(token, toIssuePayload(issueForm, project.project_id, user));
+        await createIssue(token, toIssuePayload(issueForm, project.project_id));
       }
       setIssues(await fetchProjectIssues(token, project.project_id));
       toast.success(editingIssueId ? "Issue actualizado." : "Issue creado.");
@@ -1283,12 +1304,16 @@ export default function ProjectDetail({ params }: { params: { projectId: string 
                 <span className={`status-pill status-${project.status.toLowerCase().replaceAll(" ", "-")}`}>
                   {project.status}
                 </span>
-                <button className="secondary-button" onClick={() => setModal("project-edit")} type="button">
-                  Editar proyecto
-                </button>
-                <button className="danger-button" onClick={() => setModal("project-delete")} type="button">
-                  Eliminar proyecto
-                </button>
+                {!dev ? (
+                  <>
+                    <button className="secondary-button" onClick={() => setModal("project-edit")} type="button">
+                      Editar proyecto
+                    </button>
+                    <button className="danger-button" onClick={() => setModal("project-delete")} type="button">
+                      Eliminar proyecto
+                    </button>
+                  </>
+                ) : null}
               </div>
             </section>
 
@@ -1308,11 +1333,7 @@ export default function ProjectDetail({ params }: { params: { projectId: string 
                   <div>
                     <dt>Responsable</dt>
                     <dd>
-                      {project.project_manager === user?.id
-                        ? "Tu usuario"
-                        : project.project_manager === null
-                          ? "Sin asignar"
-                          : `Usuario #${project.project_manager}`}
+                      {project.project_manager === null ? "Sin asignar" : (() => { const u = users.find((u) => u.id === project.project_manager); if (!u) return `Usuario #${project.project_manager}`; const full = `${u.first_name} ${u.last_name}`.trim(); return full || u.username; })()}
                     </dd>
                   </div>
                   <div>
@@ -1653,17 +1674,19 @@ export default function ProjectDetail({ params }: { params: { projectId: string 
 
               <ModuleCard
                 action={
-                  <button
-                    className="secondary-button"
-                    onClick={() => {
-                      setIssueForm(EMPTY_ISSUE_FORM);
-                      setEditingIssueId(null);
-                      setModal("issue-create");
-                    }}
-                    type="button"
-                  >
-                    Nuevo issue
-                  </button>
+                  !dev ? (
+                    <button
+                      className="secondary-button"
+                      onClick={() => {
+                        setIssueForm(EMPTY_ISSUE_FORM);
+                        setEditingIssueId(null);
+                        setModal("issue-create");
+                      }}
+                      type="button"
+                    >
+                      Nuevo issue
+                    </button>
+                  ) : undefined
                 }
                 description="Pendientes y trabajo operativo del proyecto."
                 title="Issues"
@@ -1724,7 +1747,7 @@ export default function ProjectDetail({ params }: { params: { projectId: string 
                             {issue.status}
                           </span>
                           <span>Limite: {issue.due_date ? formatShortSpanishDate(issue.due_date) : "Sin fecha"}</span>
-                          <span>Asignado: {issue.assigned_to === user?.id ? "Tu usuario" : issue.assigned_to === null ? "Sin asignar" : `Usuario #${issue.assigned_to}`}</span>
+                          <span>Asignado: {issue.assigned_to === null ? "Sin asignar" : (() => { const u = users.find((u) => u.id === issue.assigned_to); if (!u) return `Usuario #${issue.assigned_to}`; const full = `${u.first_name} ${u.last_name}`.trim(); return full || u.username; })()}</span>
                         </div>
                       </article>
                     ))}
@@ -1739,9 +1762,11 @@ export default function ProjectDetail({ params }: { params: { projectId: string 
       {modal === "project-edit" ? (
         <Modal onClose={closeModal} title="Editar proyecto">
           <ProjectForm
+            editingStatus={project?.status}
             form={projectForm}
             isSaving={isSaving}
             submitLabel="Guardar cambios"
+            users={users}
             onChange={setProjectForm}
             onSubmit={handleSaveProject}
           />
@@ -1879,9 +1904,12 @@ export default function ProjectDetail({ params }: { params: { projectId: string 
       {modal === "issue-create" || modal === "issue-edit" ? (
         <Modal onClose={closeModal} title={editingIssueId ? "Editar issue" : "Nuevo issue"}>
           <IssueFormView
+            editingStatus={editingIssueId ? issues.find((i) => i.issue_id === editingIssueId)?.status : undefined}
             form={issueForm}
+            isDev={isDeveloper(user)}
             isSaving={isSaving}
             submitLabel={editingIssueId ? "Guardar cambios" : "Crear issue"}
+            users={users}
             onChange={setIssueForm}
             onSubmit={handleSaveIssue}
           />

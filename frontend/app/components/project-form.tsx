@@ -1,31 +1,43 @@
-import { PROJECT_STATUSES } from "../lib/api";
+import { getProjectStatusOptions, type AuthUser } from "../lib/api";
 
 export type ProjectFormState = {
   client: string;
   description: string;
+  managerId: number | null;
   name: string;
   planned_end_date: string;
   planned_start_date: string;
   project_type: string;
   status: string;
-  managerMode: "me" | "unassigned";
 };
 
 type ProjectFormProps = {
+  editingStatus?: string;
   form: ProjectFormState;
   isSaving: boolean;
   onChange: (next: ProjectFormState) => void;
   onSubmit: (event: React.FormEvent<HTMLFormElement>) => void;
   submitLabel: string;
+  users: AuthUser[];
 };
 
+function displayName(user: AuthUser): string {
+  const full = `${user.first_name} ${user.last_name}`.trim();
+  return full || user.username;
+}
+
 export function ProjectForm({
+  editingStatus,
   form,
   isSaving,
   onChange,
   onSubmit,
   submitLabel,
+  users,
 }: ProjectFormProps) {
+  const statusOptions = getProjectStatusOptions(editingStatus);
+  const isStatusLocked = statusOptions.length <= 1;
+
   return (
     <form className="stack-form" onSubmit={onSubmit}>
       <label className="field">
@@ -62,10 +74,11 @@ export function ProjectForm({
         <label className="field">
           <span>Estado</span>
           <select
+            disabled={isStatusLocked}
             value={form.status}
             onChange={(event) => onChange({ ...form, status: event.target.value })}
           >
-            {PROJECT_STATUSES.map((status) => (
+            {statusOptions.map((status) => (
               <option key={status} value={status}>
                 {status}
               </option>
@@ -76,16 +89,20 @@ export function ProjectForm({
         <label className="field">
           <span>Responsable</span>
           <select
-            value={form.managerMode}
+            value={form.managerId ?? ""}
             onChange={(event) =>
               onChange({
                 ...form,
-                managerMode: event.target.value as ProjectFormState["managerMode"],
+                managerId: event.target.value ? Number(event.target.value) : null,
               })
             }
           >
-            <option value="me">Asignarme</option>
-            <option value="unassigned">Sin asignar</option>
+            <option value="">Sin asignar</option>
+            {users.map((u) => (
+              <option key={u.id} value={u.id}>
+                {displayName(u)}
+              </option>
+            ))}
           </select>
         </label>
       </div>

@@ -8,6 +8,46 @@ export const PROJECT_STATUSES = [
   "Cancelled",
 ] as const;
 
+export const PROJECT_STATUS_TRANSITIONS: Record<string, string[]> = {
+  "Not Started": ["In Progress", "Cancelled"],
+  "In Progress": ["On Hold", "Completed", "Cancelled"],
+  "On Hold": ["In Progress", "Cancelled"],
+  "Completed": [],
+  "Cancelled": [],
+};
+
+export function getProjectStatusOptions(currentStatus: string | undefined): string[] {
+  if (!currentStatus) return ["Not Started"];
+  return [currentStatus, ...(PROJECT_STATUS_TRANSITIONS[currentStatus] ?? [])];
+}
+
+export const ISSUE_STATUSES = [
+  "Not Started",
+  "In Progress",
+  "Review",
+  "On Hold",
+  "Completed",
+  "Cancelled",
+] as const;
+
+export const ISSUE_STATUS_TRANSITIONS: Record<string, string[]> = {
+  "Not Started": ["In Progress", "Cancelled"],
+  "In Progress": ["Review", "On Hold", "Cancelled"],
+  "Review": ["In Progress", "Completed", "Cancelled"],
+  "On Hold": ["In Progress", "Cancelled"],
+  "Completed": [],
+  "Cancelled": [],
+};
+
+export function getIssueStatusOptions(currentStatus: string | undefined, isDev = false): string[] {
+  if (!currentStatus) return ["Not Started"];
+  const transitions = ISSUE_STATUS_TRANSITIONS[currentStatus] ?? [];
+  if (isDev) {
+    return transitions.includes("Review") ? [currentStatus, "Review"] : [currentStatus];
+  }
+  return [currentStatus, ...transitions];
+}
+
 export const AUCTION_STATUSES = [
   "Not Started",
   "In Progress",

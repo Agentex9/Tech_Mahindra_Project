@@ -34,6 +34,14 @@ function toDateTimeLocal(value: string) {
   return localDate.toISOString().slice(0, 16);
 }
 
+function nowLocal(): string {
+  return toDateTimeLocal(new Date().toISOString());
+}
+
+function nowPlusMinutes(minutes: number): string {
+  return toDateTimeLocal(new Date(Date.now() + minutes * 60000).toISOString());
+}
+
 export function meta() {
   return [
     { title: "WorkTrack | Subasta" },
@@ -52,8 +60,8 @@ export default function AuctionPage() {
   const [bidAmount, setBidAmount] = useState("");
   const [selectedCard, setSelectedCard] = useState<AuctionCardData | null>(null);
   const [createIssueId, setCreateIssueId] = useState("");
-  const [createStart, setCreateStart] = useState("");
-  const [createEnd, setCreateEnd] = useState("");
+  const [createStart, setCreateStart] = useState(nowLocal);
+  const [createEnd, setCreateEnd] = useState(() => nowPlusMinutes(15));
   const [search, setSearch] = useState("");
   const [page, setPage] = useState(1);
   const [pageSize, setPageSize] = useState(12);
@@ -108,7 +116,8 @@ export default function AuctionPage() {
           issue,
           topBid: sortedBids[0] ?? null,
         };
-      });
+      })
+      .filter((card) => card.auction === null || card.auction.status !== "Completed");
   }, [auctions, bidsByAuction, issues]);
 
   const filteredBiddingCards = useMemo(() => {
@@ -148,6 +157,12 @@ export default function AuctionPage() {
       return;
     }
 
+    const durationMs = new Date(createEnd).getTime() - new Date(createStart).getTime();
+    if (durationMs < 60000) {
+      toast.error("La subasta debe durar al menos 1 minuto.");
+      return;
+    }
+
     setIsSaving(true);
     try {
       await createIssueAuction(token, {
@@ -159,8 +174,8 @@ export default function AuctionPage() {
       });
       toast.success("Subasta creada.");
       setCreateIssueId("");
-      setCreateStart("");
-      setCreateEnd("");
+      setCreateStart(nowLocal());
+      setCreateEnd(nowPlusMinutes(15));
       await loadAuctionData();
     } catch (error) {
       toast.error(error instanceof Error ? error.message : "No fue posible crear la subasta.");
@@ -194,6 +209,12 @@ export default function AuctionPage() {
   async function handleBidSubmit() {
     if (!selectedCard?.auction) {
       toast.error("Este issue aun no tiene una subasta activa.");
+      return;
+    }
+
+    if (selectedCard.auction.status === "Completed") {
+      toast.error("Esta subasta ya esta cerrada.");
+      setSelectedCard(null);
       return;
     }
 
@@ -355,9 +376,13 @@ export default function AuctionPage() {
               </div>
             </dl>
             <div className="portfolio-card-actions">
-              {card.auction ? (
+              {card.auction && card.auction.status !== "Completed" ? (
                 <button className="primary-button" onClick={() => setSelectedCard(card)} type="button">
                   Ofertar
+                </button>
+              ) : card.auction?.status === "Completed" ? (
+                <button className="secondary-button" disabled type="button">
+                  Subasta cerrada
                 </button>
               ) : isPrivilegedUser(user) ? (
                 <button className="primary-button" disabled={isSaving} onClick={() => void handleQuickStartAuction(card.issue.issue_id)} type="button">

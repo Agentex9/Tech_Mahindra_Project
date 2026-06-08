@@ -11,8 +11,11 @@ import {
   fetchIssues,
   fetchLabels,
   fetchProjects,
-  PROJECT_STATUSES,
+  fetchUsers,
+  getIssueStatusOptions,
+  ISSUE_STATUSES,
   updateIssue,
+  type AuthUser,
   type Issue,
   type IssueFilters,
   type IssuePayload,
@@ -25,8 +28,7 @@ import { useDashboardContext } from "../lib/dashboard";
 import { formatShortSpanishDate, formatShortSpanishDateTime } from "../lib/date";
 
 type IssueCreateFormState = {
-  assignedMode: "me" | "unassigned" | "other";
-  assigned_to: number | null;
+  assignedId: number | null;
   assignment_type: string;
   description: string;
   due_date: string;
@@ -41,8 +43,7 @@ type IssueCreateFormState = {
 };
 
 const EMPTY_FORM: IssueCreateFormState = {
-  assignedMode: "unassigned",
-  assigned_to: null,
+  assignedId: null,
   assignment_type: "",
   description: "",
   due_date: "",
@@ -89,9 +90,9 @@ const EMPTY_LABEL_FORM: LabelCreateFormState = {
   project: "",
 };
 
-function toPayload(form: IssueCreateFormState, userId: number): IssuePayload {
+function toPayload(form: IssueCreateFormState): IssuePayload {
   return {
-    assigned_to: form.assignedMode === "me" ? userId : form.assignedMode === "other" ? form.assigned_to : null,
+    assigned_to: form.assignedId,
     assignment_type: form.assignment_type || null,
     description: form.description.trim() || null,
     due_date: form.due_date || null,
@@ -106,10 +107,9 @@ function toPayload(form: IssueCreateFormState, userId: number): IssuePayload {
   };
 }
 
-function toForm(issue: Issue, userId: number): IssueCreateFormState {
+function toForm(issue: Issue): IssueCreateFormState {
   return {
-    assignedMode: issue.assigned_to === null ? "unassigned" : issue.assigned_to === userId ? "me" : "other",
-    assigned_to: issue.assigned_to,
+    assignedId: issue.assigned_to,
     assignment_type: issue.assignment_type ?? "",
     description: issue.description ?? "",
     due_date: issue.due_date ?? "",
@@ -145,6 +145,7 @@ export default function IssuesPage() {
   const [issues, setIssues] = useState<Issue[]>([]);
   const [projects, setProjects] = useState<Project[]>([]);
   const [labels, setLabels] = useState<Label[]>([]);
+  const [users, setUsers] = useState<AuthUser[]>([]);
   const [filters, setFilters] = useState<IssueFiltersState>(EMPTY_FILTERS);
   const [isCreateOpen, setIsCreateOpen] = useState(false);
   const [isCreateLabelOpen, setIsCreateLabelOpen] = useState(false);
@@ -170,15 +171,17 @@ export default function IssuesPage() {
   async function loadIssues() {
     try {
       setIsLoading(true);
-      const [issuesPayload, projectsPayload, labelsPayload] = await Promise.all([
+      const [issuesPayload, projectsPayload, labelsPayload, usersPayload] = await Promise.all([
         fetchIssues(token, toIssueFilters()),
         fetchProjects(token),
         fetchLabels(token),
+        fetchUsers(token).catch(() => [] as AuthUser[]),
       ]);
 
       setIssues(issuesPayload);
       setProjects(projectsPayload);
       setLabels(labelsPayload);
+      setUsers(usersPayload);
     } catch (error) {
       toast.error(error instanceof Error ? error.message : "No fue posible cargar los issues.");
     } finally {
@@ -190,15 +193,7 @@ export default function IssuesPage() {
     void loadIssues();
   }, [token, filters.assigned, filters.assignment_type, filters.priority, filters.project, filters.status, filters.title]);
 
-  const visibleIssues = useMemo(() => {
-    return issues.filter((issue) => {
-      if (isDeveloper(user) && issue.assigned_to !== user.id) {
-        return false;
-      }
-
-      return true;
-    });
-  }, [issues, user]);
+  const visibleIssues = useMemo(() => issues, [issues]);
 
   const paginatedIssues = useMemo(() => paginate(visibleIssues, page, pageSize), [visibleIssues, page, pageSize]);
 
@@ -227,10 +222,10 @@ export default function IssuesPage() {
     setIsSaving(true);
     try {
       if (editingIssueId) {
-        await updateIssue(token, editingIssueId, toPayload(form, user.id));
+        await updateIssue(token, editingIssueId, toPayload(form));
         toast.success("Issue actualizado.");
       } else {
-        await createIssue(token, toPayload(form, user.id));
+        await createIssue(token, toPayload(form));
         toast.success("Issue creado.");
       }
 
@@ -275,29 +270,31 @@ export default function IssuesPage() {
           <h1>{isDeveloper(user) ? "Tus issues asignados" : "Todos los issues del portafolio"}</h1>
           <p className="subtle-copy">Aqui tambien puedes crear issues y asignarlos directamente a un proyecto.</p>
         </div>
-        <div className="hero-actions">
-          <button
-            className="primary-button"
-            onClick={() => {
-              setEditingIssueId(null);
-              setForm(EMPTY_FORM);
-              setIsCreateOpen(true);
-            }}
-            type="button"
-          >
-            Nuevo issue
-          </button>
-          <button
-            className="secondary-button"
-            onClick={() => {
-              setLabelForm((current) => ({ ...current, project: filters.project || current.project }));
-              setIsCreateLabelOpen(true);
-            }}
-            type="button"
-          >
-            Crear label
-          </button>
-        </div>
+        {!isDeveloper(user) ? (
+          <div className="hero-actions">
+            <button
+              className="primary-button"
+              onClick={() => {
+                setEditingIssueId(null);
+                setForm(EMPTY_FORM);
+                setIsCreateOpen(true);
+              }}
+              type="button"
+            >
+              Nuevo issue
+            </button>
+            <button
+              className="secondary-button"
+              onClick={() => {
+                setLabelForm((current) => ({ ...current, project: filters.project || current.project }));
+                setIsCreateLabelOpen(true);
+              }}
+              type="button"
+            >
+              Crear label
+            </button>
+          </div>
+        ) : null}
       </section>
 
       <section className="simple-panel filters-panel">
@@ -323,7 +320,7 @@ export default function IssuesPage() {
             <span>Estado</span>
             <select value={filters.status} onChange={(event) => setFilters((current) => ({ ...current, status: event.target.value }))}>
               <option value="">Todos</option>
-              {PROJECT_STATUSES.map((status) => (
+              {ISSUE_STATUSES.map((status) => (
                 <option key={status} value={status}>
                   {status}
                 </option>
@@ -412,7 +409,7 @@ export default function IssuesPage() {
                 </div>
                 <div>
                   <dt>Asignado</dt>
-                  <dd>{issue.assigned_to === user.id ? "Tu usuario" : issue.assigned_to === null ? "Sin asignar" : `Usuario #${issue.assigned_to}`}</dd>
+                  <dd>{(() => { if (issue.assigned_to === null) return "Sin asignar"; const u = users.find((u) => u.id === issue.assigned_to); if (!u) return `Usuario #${issue.assigned_to}`; const full = `${u.first_name} ${u.last_name}`.trim(); return full || u.username; })()}</dd>
                 </div>
                 <div>
                   <dt>Vence</dt>
@@ -435,17 +432,19 @@ export default function IssuesPage() {
                 <Link className="secondary-button" to={`/dashboard/issues/${issue.issue_id}`}>
                   Ver detalle
                 </Link>
-                <button
-                  className="ghost-button"
-                  onClick={() => {
-                    setEditingIssueId(issue.issue_id);
-                    setForm(toForm(issue, user.id));
-                    setIsCreateOpen(true);
-                  }}
-                  type="button"
-                >
-                  Editar
-                </button>
+                {!isDeveloper(user) ? (
+                  <button
+                    className="ghost-button"
+                    onClick={() => {
+                      setEditingIssueId(issue.issue_id);
+                      setForm(toForm(issue));
+                      setIsCreateOpen(true);
+                    }}
+                    type="button"
+                  >
+                    Editar
+                  </button>
+                ) : null}
               </div>
             </article>
           );
@@ -477,13 +476,18 @@ export default function IssuesPage() {
             <div className="form-grid form-grid-3">
               <label className="field">
                 <span>Estado</span>
-                <select value={form.status} onChange={(event) => setForm((current) => ({ ...current, status: event.target.value }))}>
-                  {PROJECT_STATUSES.map((status) => (
-                    <option key={status} value={status}>
-                      {status}
-                    </option>
-                  ))}
-                </select>
+                {(() => {
+                  const statusOptions = getIssueStatusOptions(editingIssueId ? form.status : undefined, isDeveloper(user));
+                  return (
+                    <select disabled={statusOptions.length <= 1} value={form.status} onChange={(event) => setForm((current) => ({ ...current, status: event.target.value }))}>
+                      {statusOptions.map((status) => (
+                        <option key={status} value={status}>
+                          {status}
+                        </option>
+                      ))}
+                    </select>
+                  );
+                })()}
               </label>
               <label className="field">
                 <span>Prioridad</span>
@@ -512,20 +516,23 @@ export default function IssuesPage() {
               <label className="field">
                 <span>Responsable</span>
                 <select
-                  value={form.assignedMode}
+                  value={form.assignedId ?? ""}
                   onChange={(event) =>
                     setForm((current) => ({
                       ...current,
-                      assignedMode: event.target.value as IssueCreateFormState["assignedMode"],
-                      assigned_to: event.target.value === "other" ? current.assigned_to : null,
+                      assignedId: event.target.value ? Number(event.target.value) : null,
                     }))
                   }
                 >
-                  <option value="unassigned">Sin asignar</option>
-                  <option value="me">Asignarme</option>
-                  {form.assignedMode === "other" ? (
-                    <option value="other">Usuario #{form.assigned_to}</option>
-                  ) : null}
+                  <option value="">Sin asignar</option>
+                  {users.map((u) => {
+                    const full = `${u.first_name} ${u.last_name}`.trim();
+                    return (
+                      <option key={u.id} value={u.id}>
+                        {full || u.username}
+                      </option>
+                    );
+                  })}
                 </select>
               </label>
               <label className="field">

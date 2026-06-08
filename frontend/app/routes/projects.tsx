@@ -11,19 +11,22 @@ import {
   deleteProject,
   fetchProjectPlannings,
   fetchProjects,
+  fetchUsers,
   PROJECT_STATUSES,
   updateProject,
   updateProjectPlanning,
+  type AuthUser,
   type Project,
   type ProjectFilters,
   type ProjectPlanning,
 } from "../lib/api";
+import { isDeveloper } from "../lib/auth";
 import { useDashboardContext } from "../lib/dashboard";
 
 const EMPTY_FORM: ProjectFormState = {
   client: "",
   description: "",
-  managerMode: "me",
+  managerId: null,
   name: "",
   planned_end_date: "",
   planned_start_date: "",
@@ -47,12 +50,12 @@ const EMPTY_FILTERS: FiltersState = {
   status: "",
 };
 
-function toPayload(form: ProjectFormState, userId: number) {
+function toPayload(form: ProjectFormState) {
   return {
     client: form.client.trim() || null,
     description: form.description.trim() || null,
     name: form.name.trim(),
-    project_manager: form.managerMode === "me" ? userId : null,
+    project_manager: form.managerId,
     project_type: form.project_type.trim() || null,
     status: form.status,
   };
@@ -62,13 +65,21 @@ function toForm(project: Project): ProjectFormState {
   return {
     client: project.client ?? "",
     description: project.description ?? "",
-    managerMode: project.project_manager === null ? "unassigned" : "me",
+    managerId: project.project_manager,
     name: project.name,
     planned_end_date: "",
     planned_start_date: "",
     project_type: project.project_type ?? "",
     status: project.status,
   };
+}
+
+function userLabel(users: AuthUser[], id: number | null): string {
+  if (id === null) return "Sin asignar";
+  const u = users.find((u) => u.id === id);
+  if (!u) return `Usuario #${id}`;
+  const full = `${u.first_name} ${u.last_name}`.trim();
+  return full || u.username;
 }
 
 function truncate(value: string | null | undefined, limit = 150) {
@@ -89,7 +100,9 @@ export function meta() {
 export default function Projects() {
   const toast = useToast();
   const { token, user } = useDashboardContext();
+  const dev = isDeveloper(user);
   const [projects, setProjects] = useState<Project[]>([]);
+  const [users, setUsers] = useState<AuthUser[]>([]);
   const [planningByProjectId, setPlanningByProjectId] = useState<Record<string, ProjectPlanning | undefined>>({});
   const [filters, setFilters] = useState<FiltersState>(EMPTY_FILTERS);
   const [selectedIds, setSelectedIds] = useState<string[]>([]);
@@ -114,7 +127,10 @@ export default function Projects() {
   async function loadProjects() {
     setIsLoading(true);
     try {
-      const payload = await fetchProjects(token, toProjectFilters());
+      const [payload, usersPayload] = await Promise.all([
+        fetchProjects(token, toProjectFilters()),
+        fetchUsers(token).catch(() => [] as AuthUser[]),
+      ]);
       const planningEntries = await Promise.all(
         payload.map(async (project) => {
           const plannings = await fetchProjectPlannings(token, project.project_id);
@@ -122,6 +138,7 @@ export default function Projects() {
         }),
       );
       setProjects(payload);
+      setUsers(usersPayload);
       setPlanningByProjectId(Object.fromEntries(planningEntries));
     } finally {
       setIsLoading(false);
@@ -174,11 +191,11 @@ export default function Projects() {
     setIsSaving(true);
     try {
       if (editingProjectId) {
-        await updateProject(token, editingProjectId, toPayload(form, user.id));
+        await updateProject(token, editingProjectId, toPayload(form));
         const planning = planningByProjectId[editingProjectId];
         const planningPayload = {
           estimated_sprint_count: planning?.estimated_sprint_count ?? 1,
-          methodology: planning?.methodology ?? null,
+          methodology: planning?.methodology ?? "",
           planned_end_date: form.planned_end_date,
           planned_start_date: form.planned_start_date,
           project: editingProjectId,
@@ -191,10 +208,10 @@ export default function Projects() {
         }
         toast.success("Proyecto actualizado.");
       } else {
-        const project = await createProject(token, toPayload(form, user.id));
+        const project = await createProject(token, toPayload(form));
         await createProjectPlanning(token, {
           estimated_sprint_count: 1,
-          methodology: null,
+          methodology: "",
           planned_end_date: form.planned_end_date,
           planned_start_date: form.planned_start_date,
           project: project.project_id,
@@ -276,17 +293,19 @@ export default function Projects() {
           <h1>Gestiona proyectos con filtros y acciones masivas.</h1>
           <p className="subtle-copy">Cada card muestra estado, responsable y acceso inmediato al detalle operativo.</p>
         </div>
-        <div className="hero-actions">
-          <button className="primary-button" onClick={() => setModal("create")} type="button">
-            Nuevo proyecto
-          </button>
-          <button className="secondary-button" disabled={selectedIds.length === 0} onClick={() => setModal("bulk-status")} type="button">
-            Cambiar estado
-          </button>
-          <button className="danger-button" disabled={selectedIds.length === 0} onClick={() => setModal("bulk-delete")} type="button">
-            Eliminar seleccion
-          </button>
-        </div>
+        {!dev ? (
+          <div className="hero-actions">
+            <button className="primary-button" onClick={() => setModal("create")} type="button">
+              Nuevo proyecto
+            </button>
+            <button className="secondary-button" disabled={selectedIds.length === 0} onClick={() => setModal("bulk-status")} type="button">
+              Cambiar estado
+            </button>
+            <button className="danger-button" disabled={selectedIds.length === 0} onClick={() => setModal("bulk-delete")} type="button">
+              Eliminar seleccion
+            </button>
+          </div>
+        ) : null}
       </section>
 
       <section className="simple-panel filters-panel">
@@ -375,7 +394,7 @@ export default function Projects() {
               </div>
               <div>
                 <dt>Responsable</dt>
-                <dd>{project.project_manager === user.id ? "Tu usuario" : project.project_manager === null ? "Sin asignar" : `Usuario #${project.project_manager}`}</dd>
+                <dd>{userLabel(users, project.project_manager)}</dd>
               </div>
               <div>
                 <dt>Inicio</dt>
@@ -390,22 +409,24 @@ export default function Projects() {
               <Link className="secondary-button" to={`/dashboard/projects/${project.project_id}`}>
                 Abrir
               </Link>
-              <button
-                className="ghost-button"
-                onClick={() => {
-                  const planning = planningByProjectId[project.project_id];
-                  setEditingProjectId(project.project_id);
-                  setForm({
-                    ...toForm(project),
-                    planned_end_date: planning?.planned_end_date ?? "",
-                    planned_start_date: planning?.planned_start_date ?? "",
-                  });
-                  setModal("edit");
-                }}
-                type="button"
-              >
-                Editar
-              </button>
+              {!dev ? (
+                <button
+                  className="ghost-button"
+                  onClick={() => {
+                    const planning = planningByProjectId[project.project_id];
+                    setEditingProjectId(project.project_id);
+                    setForm({
+                      ...toForm(project),
+                      planned_end_date: planning?.planned_end_date ?? "",
+                      planned_start_date: planning?.planned_start_date ?? "",
+                    });
+                    setModal("edit");
+                  }}
+                  type="button"
+                >
+                  Editar
+                </button>
+              ) : null}
             </div>
           </article>
         ))}
@@ -414,9 +435,11 @@ export default function Projects() {
       {(modal === "create" || modal === "edit") ? (
         <Modal onClose={() => !isSaving && setModal(null)} title={modal === "create" ? "Nuevo proyecto" : "Editar proyecto"}>
           <ProjectForm
+            editingStatus={modal === "edit" ? projects.find((p) => p.project_id === editingProjectId)?.status : undefined}
             form={form}
             isSaving={isSaving}
             submitLabel={modal === "create" ? "Crear proyecto" : "Guardar cambios"}
+            users={users}
             onChange={setForm}
             onSubmit={handleSubmit}
           />
