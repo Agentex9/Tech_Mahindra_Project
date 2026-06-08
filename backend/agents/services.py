@@ -28,10 +28,14 @@ class AgentRuntimeConfig:
 
     @classmethod
     def from_env(cls):
-        llm_provider = os.getenv('AGENT_LLM_PROVIDER', 'openai').strip().lower()
+        llm_provider = os.getenv('AGENT_LLM_PROVIDER', 'gemini').strip().lower()
         llm_base_url = os.getenv('AGENT_LLM_BASE_URL', '').strip()
         if not llm_base_url:
-            llm_base_url = 'https://api.openai.com/v1' if llm_provider == 'openai' else 'https://api.anthropic.com/v1'
+            llm_base_url = {
+                'anthropic': 'https://api.anthropic.com/v1',
+                'gemini': 'https://generativelanguage.googleapis.com/v1beta',
+                'openai': 'https://api.openai.com/v1',
+            }.get(llm_provider, 'https://generativelanguage.googleapis.com/v1beta')
 
         embedding_provider = os.getenv('AGENT_EMBEDDING_PROVIDER', 'fastembed').strip().lower()
         embedding_base_url = os.getenv('AGENT_EMBEDDING_BASE_URL', '').strip() or 'https://api.openai.com/v1'
@@ -45,7 +49,7 @@ class AgentRuntimeConfig:
             embedding_provider=embedding_provider,
             llm_api_key=llm_api_key,
             llm_base_url=llm_base_url.rstrip('/'),
-            llm_model=os.getenv('AGENT_LLM_MODEL', 'gpt-4.1-mini').strip(),
+            llm_model=os.getenv('AGENT_LLM_MODEL', 'gemini-3.5-flash').strip(),
             llm_provider=llm_provider,
             qdrant_api_key=os.getenv('AGENT_QDRANT_API_KEY', '').strip(),
             qdrant_collection=os.getenv('AGENT_QDRANT_COLLECTION', '').strip(),
@@ -286,6 +290,23 @@ class AgentAnalysisService:
         return data[0]['embedding']
 
     def _call_llm(self, prompt: str) -> str:
+        if self.config.llm_provider == 'gemini':
+            response = self._http_post_json(
+                f'{self.config.llm_base_url}/interactions',
+                {
+                    'input': prompt,
+                    'model': self.config.llm_model,
+                },
+                headers={
+                    'Api-Revision': '2026-05-20',
+                    'x-goog-api-key': self.config.llm_api_key,
+                },
+            )
+            answer = (response.get('output_text') or '').strip()
+            if not answer:
+                raise RuntimeError('Gemini no devolvio output_text.')
+            return answer
+
         if self.config.llm_provider == 'anthropic':
             response = self._http_post_json(
                 f'{self.config.llm_base_url}/messages',

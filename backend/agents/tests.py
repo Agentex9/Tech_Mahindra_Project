@@ -3,6 +3,7 @@ from django.urls import reverse
 from rest_framework import status
 from rest_framework.test import APITestCase
 
+from agents.services import AgentAnalysisService, AgentRuntimeConfig
 from projects.models import IssueAuctions, Issues, ProjectRisks, Projects, Sprints
 
 
@@ -94,3 +95,46 @@ class AgentAnalysisApiTests(APITestCase):
         )
 
         self.assertEqual(response.status_code, status.HTTP_403_FORBIDDEN)
+
+
+class AgentAnalysisServiceTests(APITestCase):
+    def test_gemini_llm_call_uses_interactions_rest_api(self):
+        config = AgentRuntimeConfig(
+            embedding_api_key='',
+            embedding_base_url='https://api.openai.com/v1',
+            embedding_model='BAAI/bge-small-en-v1.5',
+            embedding_provider='fastembed',
+            llm_api_key='test-key',
+            llm_base_url='https://generativelanguage.googleapis.com/v1beta',
+            llm_model='gemini-3.5-flash',
+            llm_provider='gemini',
+            qdrant_api_key='',
+            qdrant_collection='',
+            qdrant_url='',
+            rag_enabled=False,
+        )
+        service = AgentAnalysisService(config=config)
+        calls = []
+
+        def fake_post(url, payload, headers=None):
+            calls.append((url, payload, headers))
+            return {'output_text': 'Respuesta ejecutiva'}
+
+        service._http_post_json = fake_post
+
+        self.assertEqual(service._call_llm('Analiza el workspace'), 'Respuesta ejecutiva')
+        self.assertEqual(calls[0][0], 'https://generativelanguage.googleapis.com/v1beta/interactions')
+        self.assertEqual(
+            calls[0][1],
+            {
+                'input': 'Analiza el workspace',
+                'model': 'gemini-3.5-flash',
+            },
+        )
+        self.assertEqual(
+            calls[0][2],
+            {
+                'Api-Revision': '2026-05-20',
+                'x-goog-api-key': 'test-key',
+            },
+        )

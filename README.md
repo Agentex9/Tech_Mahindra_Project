@@ -100,7 +100,7 @@ Sincronizar datos relacionales hacia Qdrant para el agente RAG:
 docker compose --env-file .env -f docker/docker-compose.dev.yml exec backend python manage.py sync_qdrant
 ```
 
-El agente necesita `AGENT_LLM_API_KEY` para responder con LLM real. Los embeddings RAG usan FastEmbed local por defecto, asi que no necesitan API key.
+El agente usa Gemini por defecto. Configura `AGENT_LLM_API_KEY` con tu API key de Gemini para responder con LLM real. La base URL recomendada es `AGENT_LLM_BASE_URL=https://generativelanguage.googleapis.com/v1beta`; si la omites, el backend usa ese valor por defecto cuando `AGENT_LLM_PROVIDER=gemini`. Los embeddings RAG usan FastEmbed local por defecto, asi que no necesitan API key.
 
 Para detenerlos:
 
