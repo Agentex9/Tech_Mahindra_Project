@@ -125,6 +125,22 @@ class AgentAnalysisApiTests(APITestCase):
 
 
 class AgentAnalysisServiceTests(APITestCase):
+    def test_llm_high_demand_error_is_user_friendly(self):
+        service = AgentAnalysisService()
+
+        message = service._friendly_llm_error(
+            RuntimeError(
+                'HTTP 500: {"error":{"message":"gemini-3.5-flash is currently experiencing high demand","code":"api_error"}}'
+            )
+        )
+
+        self.assertEqual(
+            message,
+            'El proveedor LLM esta saturado temporalmente. Se genero un resumen preliminar con los datos locales.',
+        )
+        self.assertNotIn('HTTP 500', message)
+        self.assertNotIn('gemini-3.5-flash', message)
+
     def test_gemini_llm_call_uses_interactions_rest_api(self):
         config = AgentRuntimeConfig(
             embedding_api_key='',

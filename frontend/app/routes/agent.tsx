@@ -13,6 +13,18 @@ import { useDashboardContext } from "../lib/dashboard";
 const DEFAULT_QUESTION = "Resume las stats generales del workspace, detecta riesgos operativos y propone acciones inmediatas.";
 type SyncStatus = "idle" | "running" | "success" | "error";
 
+function getSyncedDocumentCount(output: string) {
+  const match = output.match(/Qdrant sincronizado:\s*(\d+)\s*documentos/i);
+  return match?.[1] ?? null;
+}
+
+function truncateText(text: string, maxLength = 150) {
+  if (text.length <= maxLength) {
+    return text;
+  }
+  return `${text.slice(0, maxLength).trim()}...`;
+}
+
 export function meta() {
   return [
     { title: "WorkTrack | Agente" },
@@ -31,6 +43,7 @@ export default function AgentPage() {
   const [syncResult, setSyncResult] = useState<AgentQdrantSyncResponse | null>(null);
   const [syncError, setSyncError] = useState("");
   const [syncFinishedAt, setSyncFinishedAt] = useState("");
+  const syncedDocumentCount = syncResult ? getSyncedDocumentCount(syncResult.output) : null;
 
   if (!isPrivilegedUser(user)) {
     return (
@@ -107,21 +120,32 @@ export default function AgentPage() {
       </section>
 
       {isAdmin(user) ? (
-        <section className={`status agent-sync-status ${syncStatus === "error" ? "error" : syncStatus === "success" ? "success" : "muted"}`}>
+        <section className={`agent-sync-status sync-status-${syncStatus}`}>
           <div className="agent-sync-status-header">
-            <strong>Sincronizacion Qdrant</strong>
+            <div>
+              <strong>Indice RAG</strong>
+              <p>{syncStatus === "success" && syncedDocumentCount ? `${syncedDocumentCount} documentos sincronizados` : "Base semantica para enriquecer respuestas"}</p>
+            </div>
             <span>{syncStatus === "idle" ? "Sin ejecuciones recientes" : syncStatus === "running" ? "En progreso" : syncFinishedAt}</span>
           </div>
           {syncStatus === "idle" ? (
-            <p>Actualiza el indice RAG cuando cambien proyectos, issues, riesgos, comentarios o subastas.</p>
+            <p className="muted-copy">Sincroniza cuando cambien proyectos, issues, riesgos, comentarios o subastas.</p>
           ) : null}
           {syncStatus === "running" ? (
-            <p>Creando o actualizando la coleccion y subiendo documentos. Puede tardar si FastEmbed descarga el modelo.</p>
+            <div className="agent-sync-progress">
+              <span />
+              <p>Actualizando coleccion y documentos...</p>
+            </div>
           ) : null}
           {syncStatus === "success" && syncResult ? (
             <div className="agent-sync-output">
               <p>{syncResult.detail}</p>
-              {syncResult.output ? <pre>{syncResult.output.trim()}</pre> : null}
+              {syncResult.output ? (
+                <details>
+                  <summary>Ver detalle tecnico</summary>
+                  <pre>{syncResult.output.trim()}</pre>
+                </details>
+              ) : null}
             </div>
           ) : null}
           {syncStatus === "error" ? <p>{syncError}</p> : null}
@@ -182,35 +206,45 @@ export default function AgentPage() {
                 </article>
               </div>
 
-              <section className="status success">
-                <strong>{result.mode === "llm" ? "Analisis LLM" : "Preview disponible"}</strong>
+              <section className={`agent-answer-card ${result.mode === "llm" ? "agent-answer-card-live" : "agent-answer-card-preview"}`}>
+                <div>
+                  <span>{result.mode === "llm" ? "Analisis LLM" : "Resumen preliminar"}</span>
+                  <strong>{result.mode === "llm" ? "Respuesta generada" : "Proveedor LLM no disponible"}</strong>
+                </div>
                 <p>{result.answer}</p>
               </section>
 
               {result.warnings.length > 0 ? (
-                <section className="status muted">
-                  <strong>Advertencias</strong>
-                  <ul className="bullet-list">
-                    {result.warnings.map((warning) => (
-                      <li key={warning}>{warning}</li>
-                    ))}
-                  </ul>
+                <section className="agent-notice">
+                  <strong>Nota</strong>
+                  <p>{result.warnings[0]}</p>
                 </section>
               ) : null}
 
-              <section className="simple-panel agent-context-panel">
-                <h3>Contexto recuperado</h3>
+              <section className="agent-context-panel">
+                <div className="agent-context-heading">
+                  <div>
+                    <h3>Fuentes usadas</h3>
+                    <p>{result.context_snippets.length} fragmentos recuperados del indice RAG</p>
+                  </div>
+                </div>
                 {result.context_snippets.length === 0 ? (
-                  <p className="muted-copy">Todavia no hubo fragmentos RAG. Configura embeddings + Qdrant para enriquecer el analisis.</p>
+                  <p className="muted-copy">Todavia no hay fragmentos RAG disponibles.</p>
                 ) : (
-                  <div className="module-list">
+                  <div className="agent-source-grid">
                     {result.context_snippets.map((snippet, index) => (
-                      <article className="module-item" key={`${snippet.id ?? snippet.title ?? "snippet"}-${index}`}>
-                        <div className="module-item-head">
+                      <article className="agent-source-card" key={`${snippet.id ?? snippet.title ?? "snippet"}-${index}`}>
+                        <div>
                           <strong>{snippet.title || `Fragmento ${index + 1}`}</strong>
-                          {typeof snippet.score === "number" ? <span className="muted-inline">score {snippet.score.toFixed(3)}</span> : null}
+                          {typeof snippet.score === "number" ? <span>{Math.round(snippet.score * 100)}% relevante</span> : null}
                         </div>
-                        <p className="muted-copy">{snippet.text}</p>
+                        <p>{truncateText(snippet.text)}</p>
+                        {snippet.text.length > 150 ? (
+                          <details>
+                            <summary>Ver fragmento completo</summary>
+                            <p>{snippet.text}</p>
+                          </details>
+                        ) : null}
                       </article>
                     ))}
                   </div>

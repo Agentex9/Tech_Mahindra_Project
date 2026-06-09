@@ -130,7 +130,7 @@ class AgentAnalysisService:
             answer = self._call_llm(prompt)
             mode = 'llm'
         except Exception as exc:  # pragma: no cover - defensive against remote failures
-            warnings.append(f'No fue posible consultar el LLM externo: {exc}')
+            warnings.append(self._friendly_llm_error(exc))
             answer = self._build_preview_answer(stats=stats, context_snippets=context_snippets, warnings=warnings)
             mode = 'preview'
 
@@ -233,17 +233,26 @@ class AgentAnalysisService:
         )
 
     def _build_preview_answer(self, *, stats: dict[str, Any], context_snippets: list[dict[str, Any]], warnings: list[str]) -> str:
-        top_project_names = ', '.join(project['name'] for project in stats['projects'][:3]) or 'sin proyectos registrados'
+        unique_project_names = list(dict.fromkeys(project['name'] for project in stats['projects']))
+        top_project_names = ', '.join(unique_project_names[:3]) or 'sin proyectos registrados'
         snippet_count = len(context_snippets)
-        warning_text = ' '.join(warnings) if warnings else 'Sin advertencias adicionales.'
         return (
-            'Preview del agente listo. '\
+            'Resumen preliminar generado con datos del workspace. '\
             f'Se detectaron {stats["project_count"]} proyectos, {stats["total_issues"]} issues, '\
             f'{stats["total_risks"]} riesgos y {stats["active_auctions"]} subastas activas. '\
             f'Proyectos visibles: {top_project_names}. '\
-            f'Contexto RAG recuperado: {snippet_count} fragmentos. '\
-            f'Advertencias: {warning_text}'
+            f'Contexto RAG disponible: {snippet_count} fragmentos.'
         )
+
+    def _friendly_llm_error(self, exc: Exception) -> str:
+        message = str(exc)
+        if 'high demand' in message or 'api_error' in message or 'HTTP 500' in message:
+            return 'El proveedor LLM esta saturado temporalmente. Se genero un resumen preliminar con los datos locales.'
+        if 'Timeout' in message:
+            return 'El proveedor LLM tardo demasiado en responder. Se genero un resumen preliminar con los datos locales.'
+        if 'HTTP 401' in message or 'HTTP 403' in message:
+            return 'No se pudo autenticar con el proveedor LLM. Revisa la API key configurada.'
+        return 'No fue posible consultar el proveedor LLM. Se genero un resumen preliminar con los datos locales.'
 
     def _search_qdrant(self, *, question: str, top_k: int) -> list[dict[str, Any]]:
         vector = self._embed_query(question)
