@@ -106,8 +106,8 @@ export default function AgentPage() {
         </div>
         <div className="hero-actions">
           {isAdmin(user) ? (
-            <button className="secondary-button" disabled={isSyncing} onClick={() => void handleSyncQdrant()} type="button">
-              {isSyncing ? "Sincronizando..." : "Sincronizar Qdrant"}
+            <button className="secondary-button agent-sync-button" disabled={isSyncing} onClick={() => void handleSyncQdrant()} type="button">
+              {isSyncing ? "Sincronizando" : "Sincronizar RAG"}
             </button>
           ) : null}
           {isAdmin(user) && syncStatus !== "idle" ? (
@@ -240,7 +240,7 @@ export default function AgentPage() {
                         </div>
                         <p>{truncateText(snippet.text)}</p>
                         {snippet.text.length > 150 ? (
-                          <details>
+                          <details className="agent-source-details">
                             <summary>Ver fragmento completo</summary>
                             <p>{snippet.text}</p>
                           </details>
