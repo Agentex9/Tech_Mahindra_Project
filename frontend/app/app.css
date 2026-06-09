@@ -1365,6 +1365,65 @@ code {
   gap: var(--space-3);
 }
 
+.agent-sync-status {
+  margin-top: 0;
+}
+
+.agent-sync-status-header {
+  display: flex;
+  align-items: center;
+  justify-content: space-between;
+  gap: var(--space-2);
+  flex-wrap: wrap;
+}
+
+.agent-sync-status-header span {
+  color: var(--color-text-soft);
+  font-size: 0.9rem;
+  font-weight: 600;
+}
+
+.agent-sync-output {
+  display: grid;
+  gap: var(--space-2);
+}
+
+.agent-sync-output p {
+  margin-bottom: 0;
+}
+
+.agent-sync-output pre {
+  max-height: 12rem;
+  margin: 0;
+  padding: 0.75rem;
+  overflow: auto;
+  border: 1px solid var(--color-border);
+  border-radius: 0.75rem;
+  background: color-mix(in srgb, var(--color-panel) 80%, var(--color-bg));
+  color: var(--color-text);
+  font-size: 0.85rem;
+  line-height: 1.45;
+  white-space: pre-wrap;
+}
+
+.sync-pill-running {
+  color: var(--color-text-soft);
+  border-color: var(--color-border-strong);
+  background: color-mix(in srgb, var(--color-panel) 82%, var(--color-bg));
+}
+
+.sync-pill-success {
+  color: var(--color-success);
+  border-color: var(--color-success-border);
+  background: var(--color-success-bg);
+}
+
+.sync-pill-error {
+  color: var(--color-danger);
+  border-color: var(--color-danger-border);
+  background: var(--color-danger-bg);
+}
+
 .agent-question-input {
   min-height: 10rem;
   max-height: 20rem;

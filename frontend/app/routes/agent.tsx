@@ -5,11 +5,13 @@ import {
   analyzeAgentWorkspace,
   syncAgentQdrant,
   type AgentAnalysisResponse,
+  type AgentQdrantSyncResponse,
 } from "../lib/api";
 import { isAdmin, isPrivilegedUser } from "../lib/auth";
 import { useDashboardContext } from "../lib/dashboard";
 
 const DEFAULT_QUESTION = "Resume las stats generales del workspace, detecta riesgos operativos y propone acciones inmediatas.";
+type SyncStatus = "idle" | "running" | "success" | "error";
 
 export function meta() {
   return [
@@ -25,6 +27,10 @@ export default function AgentPage() {
   const [result, setResult] = useState<AgentAnalysisResponse | null>(null);
   const [isLoading, setIsLoading] = useState(false);
   const [isSyncing, setIsSyncing] = useState(false);
+  const [syncStatus, setSyncStatus] = useState<SyncStatus>("idle");
+  const [syncResult, setSyncResult] = useState<AgentQdrantSyncResponse | null>(null);
+  const [syncError, setSyncError] = useState("");
+  const [syncFinishedAt, setSyncFinishedAt] = useState("");
 
   if (!isPrivilegedUser(user)) {
     return (
@@ -55,11 +61,21 @@ export default function AgentPage() {
 
   async function handleSyncQdrant() {
     setIsSyncing(true);
+    setSyncStatus("running");
+    setSyncError("");
+    setSyncResult(null);
     try {
       const response = await syncAgentQdrant(token);
+      setSyncResult(response);
+      setSyncStatus("success");
+      setSyncFinishedAt(new Date().toLocaleTimeString("es-MX", { hour: "2-digit", minute: "2-digit" }));
       toast.success(response.detail);
     } catch (error) {
-      toast.error(error instanceof Error ? error.message : "No fue posible sincronizar Qdrant.");
+      const message = error instanceof Error ? error.message : "No fue posible sincronizar Qdrant.";
+      setSyncError(message);
+      setSyncStatus("error");
+      setSyncFinishedAt(new Date().toLocaleTimeString("es-MX", { hour: "2-digit", minute: "2-digit" }));
+      toast.error(message);
     } finally {
       setIsSyncing(false);
     }
@@ -81,9 +97,36 @@ export default function AgentPage() {
               {isSyncing ? "Sincronizando..." : "Sincronizar Qdrant"}
             </button>
           ) : null}
+          {isAdmin(user) && syncStatus !== "idle" ? (
+            <span className={`status-pill sync-pill sync-pill-${syncStatus}`}>
+              {syncStatus === "running" ? "Qdrant sincronizando" : syncStatus === "success" ? "Qdrant listo" : "Qdrant con error"}
+            </span>
+          ) : null}
           <span className="status-pill">{result?.mode === "llm" ? "LLM activo" : "Preview / setup"}</span>
         </div>
       </section>
+
+      {isAdmin(user) ? (
+        <section className={`status agent-sync-status ${syncStatus === "error" ? "error" : syncStatus === "success" ? "success" : "muted"}`}>
+          <div className="agent-sync-status-header">
+            <strong>Sincronizacion Qdrant</strong>
+            <span>{syncStatus === "idle" ? "Sin ejecuciones recientes" : syncStatus === "running" ? "En progreso" : syncFinishedAt}</span>
+          </div>
+          {syncStatus === "idle" ? (
+            <p>Actualiza el indice RAG cuando cambien proyectos, issues, riesgos, comentarios o subastas.</p>
+          ) : null}
+          {syncStatus === "running" ? (
+            <p>Creando o actualizando la coleccion y subiendo documentos. Puede tardar si FastEmbed descarga el modelo.</p>
+          ) : null}
+          {syncStatus === "success" && syncResult ? (
+            <div className="agent-sync-output">
+              <p>{syncResult.detail}</p>
+              {syncResult.output ? <pre>{syncResult.output.trim()}</pre> : null}
+            </div>
+          ) : null}
+          {syncStatus === "error" ? <p>{syncError}</p> : null}
+        </section>
+      ) : null}
 
       <section className="agent-layout">
         <article className="simple-panel agent-compose-panel">

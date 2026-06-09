@@ -92,6 +92,8 @@ Servicios:
 - PostgreSQL: `localhost:5432`
 - Qdrant: `http://localhost:6333`
 
+Docker usa Qdrant `v1.18.0`, alineado con `qdrant-client 1.18.x` para evitar advertencias de compatibilidad entre cliente y servidor.
+
 En `.env`, para Docker dev usa `AGENT_QDRANT_URL=http://qdrant:6333`. Si ejecutas Django fuera de Docker, usa `http://localhost:6333`.
 
 Sincronizar datos relacionales hacia Qdrant para el agente RAG:

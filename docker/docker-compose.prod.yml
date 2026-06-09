@@ -16,7 +16,7 @@ services:
       - postgres_data:/var/lib/postgresql/data
 
   qdrant:
-    image: qdrant/qdrant:v1.15.4
+    image: qdrant/qdrant:v1.18.0
     container_name: worktrack_qdrant
     restart: unless-stopped
     volumes:
