@@ -367,6 +367,11 @@ export type AgentAnalysisResponse = {
   warnings: string[];
 };
 
+export type AgentQdrantSyncResponse = {
+  detail: string;
+  output: string;
+};
+
 function getHeaders(token?: string, hasBody = false) {
   const headers = new Headers();
 
@@ -540,6 +545,10 @@ export function analyzeAgentWorkspace(
     "/agents/analyze/",
     payload,
   );
+}
+
+export function syncAgentQdrant(token: string) {
+  return create<AgentQdrantSyncResponse, Record<string, never>>(token, "/agents/sync-qdrant/", {});
 }
 
 export function fetchProjects(token: string, query?: ProjectFilters) {

@@ -1,3 +1,5 @@
+from unittest.mock import patch
+
 from django.contrib.auth import get_user_model
 from django.urls import reverse
 from rest_framework import status
@@ -12,6 +14,11 @@ User = get_user_model()
 
 class AgentAnalysisApiTests(APITestCase):
     def setUp(self):
+        self.admin = User.objects.create_user(
+            username='admin-user',
+            password='password123',
+            role='Admin',
+        )
         self.pm = User.objects.create_user(
             username='pm-user',
             password='password123',
@@ -96,6 +103,26 @@ class AgentAnalysisApiTests(APITestCase):
 
         self.assertEqual(response.status_code, status.HTTP_403_FORBIDDEN)
 
+    @patch('agents.views.call_command')
+    def test_admin_can_sync_qdrant(self, call_command_mock):
+        self.client.force_authenticate(user=self.admin)
+
+        response = self.client.post(reverse('agents:sync-qdrant'), {}, format='json')
+
+        self.assertEqual(response.status_code, status.HTTP_200_OK)
+        self.assertEqual(response.data['detail'], 'Qdrant sincronizado correctamente.')
+        call_command_mock.assert_called_once()
+        self.assertEqual(call_command_mock.call_args.args[0], 'sync_qdrant')
+
+    @patch('agents.views.call_command')
+    def test_pm_cannot_sync_qdrant(self, call_command_mock):
+        self.client.force_authenticate(user=self.pm)
+
+        response = self.client.post(reverse('agents:sync-qdrant'), {}, format='json')
+
+        self.assertEqual(response.status_code, status.HTTP_403_FORBIDDEN)
+        call_command_mock.assert_not_called()
+
 
 class AgentAnalysisServiceTests(APITestCase):
     def test_gemini_llm_call_uses_interactions_rest_api(self):
@@ -104,6 +131,7 @@ class AgentAnalysisServiceTests(APITestCase):
             embedding_base_url='https://api.openai.com/v1',
             embedding_model='BAAI/bge-small-en-v1.5',
             embedding_provider='fastembed',
+            http_timeout_seconds=20,
             llm_api_key='test-key',
             llm_base_url='https://generativelanguage.googleapis.com/v1beta',
             llm_model='gemini-3.5-flash',

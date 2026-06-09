@@ -48,3 +48,8 @@ class AgentAnalysisResponseSerializer(serializers.Serializer):
     rag_enabled = serializers.BooleanField()
     stats = AgentWorkspaceStatsSerializer()
     warnings = serializers.ListField(child=serializers.CharField())
+
+
+class AgentQdrantSyncResponseSerializer(serializers.Serializer):
+    detail = serializers.CharField()
+    output = serializers.CharField(allow_blank=True)

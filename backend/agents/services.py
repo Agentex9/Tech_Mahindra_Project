@@ -11,12 +11,23 @@ from django.utils import timezone
 from projects.models import IssueAuctions, Issues, ProjectRisks, Projects, Sprints
 
 
+def _env_float(name: str, default: float) -> float:
+    raw_value = os.getenv(name, '').strip()
+    if not raw_value:
+        return default
+    try:
+        return float(raw_value)
+    except ValueError:
+        return default
+
+
 @dataclass
 class AgentRuntimeConfig:
     embedding_api_key: str
     embedding_base_url: str
     embedding_model: str
     embedding_provider: str
+    http_timeout_seconds: float
     llm_api_key: str
     llm_base_url: str
     llm_model: str
@@ -47,6 +58,7 @@ class AgentRuntimeConfig:
             embedding_base_url=embedding_base_url.rstrip('/'),
             embedding_model=os.getenv('AGENT_EMBEDDING_MODEL', 'BAAI/bge-small-en-v1.5').strip(),
             embedding_provider=embedding_provider,
+            http_timeout_seconds=_env_float('AGENT_HTTP_TIMEOUT_SECONDS', 20),
             llm_api_key=llm_api_key,
             llm_base_url=llm_base_url.rstrip('/'),
             llm_model=os.getenv('AGENT_LLM_MODEL', 'gemini-3.5-flash').strip(),
@@ -77,6 +89,8 @@ class AgentRuntimeConfig:
 
 
 class AgentAnalysisService:
+    _fastembed_models: dict[str, Any] = {}
+
     def __init__(self, config: AgentRuntimeConfig | None = None):
         self.config = config or AgentRuntimeConfig.from_env()
 
@@ -265,7 +279,10 @@ class AgentAnalysisService:
             except ImportError as exc:
                 raise RuntimeError('Falta instalar fastembed para usar embeddings locales.') from exc
 
-            model = TextEmbedding(model_name=self.config.embedding_model)
+            model = self._fastembed_models.get(self.config.embedding_model)
+            if model is None:
+                model = TextEmbedding(model_name=self.config.embedding_model)
+                self._fastembed_models[self.config.embedding_model] = model
             embeddings = list(model.embed([question]))
             if not embeddings:
                 raise RuntimeError('FastEmbed no devolvio vectores.')
@@ -368,13 +385,15 @@ class AgentAnalysisService:
             method='POST',
         )
         try:
-            with request.urlopen(raw_request, timeout=30) as response:
+            with request.urlopen(raw_request, timeout=self.config.http_timeout_seconds) as response:
                 body = response.read().decode('utf-8')
         except error.HTTPError as exc:
             error_body = exc.read().decode('utf-8', errors='replace')
             raise RuntimeError(f'HTTP {exc.code}: {error_body}') from exc
         except error.URLError as exc:
             raise RuntimeError(str(exc.reason)) from exc
+        except TimeoutError as exc:
+            raise RuntimeError(f'Timeout despues de {self.config.http_timeout_seconds:g}s al llamar {url}.') from exc
 
         return json.loads(body)
 

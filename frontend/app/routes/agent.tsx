@@ -3,9 +3,10 @@ import { useState } from "react";
 import { useToast } from "../components/toast-provider";
 import {
   analyzeAgentWorkspace,
+  syncAgentQdrant,
   type AgentAnalysisResponse,
 } from "../lib/api";
-import { isPrivilegedUser } from "../lib/auth";
+import { isAdmin, isPrivilegedUser } from "../lib/auth";
 import { useDashboardContext } from "../lib/dashboard";
 
 const DEFAULT_QUESTION = "Resume las stats generales del workspace, detecta riesgos operativos y propone acciones inmediatas.";
@@ -23,6 +24,7 @@ export default function AgentPage() {
   const [question, setQuestion] = useState(DEFAULT_QUESTION);
   const [result, setResult] = useState<AgentAnalysisResponse | null>(null);
   const [isLoading, setIsLoading] = useState(false);
+  const [isSyncing, setIsSyncing] = useState(false);
 
   if (!isPrivilegedUser(user)) {
     return (
@@ -51,6 +53,18 @@ export default function AgentPage() {
     }
   }
 
+  async function handleSyncQdrant() {
+    setIsSyncing(true);
+    try {
+      const response = await syncAgentQdrant(token);
+      toast.success(response.detail);
+    } catch (error) {
+      toast.error(error instanceof Error ? error.message : "No fue posible sincronizar Qdrant.");
+    } finally {
+      setIsSyncing(false);
+    }
+  }
+
   return (
     <section className="dashboard-content agent-page">
       <section className="hero-banner compact">
@@ -62,6 +76,11 @@ export default function AgentPage() {
           </p>
         </div>
         <div className="hero-actions">
+          {isAdmin(user) ? (
+            <button className="secondary-button" disabled={isSyncing} onClick={() => void handleSyncQdrant()} type="button">
+              {isSyncing ? "Sincronizando..." : "Sincronizar Qdrant"}
+            </button>
+          ) : null}
           <span className="status-pill">{result?.mode === "llm" ? "LLM activo" : "Preview / setup"}</span>
         </div>
       </section>
