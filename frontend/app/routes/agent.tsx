@@ -115,7 +115,9 @@ export default function AgentPage() {
               {syncStatus === "running" ? "Qdrant sincronizando" : syncStatus === "success" ? "Qdrant listo" : "Qdrant con error"}
             </span>
           ) : null}
-          <span className="status-pill">{result?.mode === "llm" ? "LLM activo" : "Preview / setup"}</span>
+          <span className={`status-pill agent-mode-pill ${result?.mode === "llm" ? "agent-mode-pill-live" : "agent-mode-pill-preview"}`}>
+            {result?.mode === "llm" ? "LLM activo" : "Preview"}
+          </span>
         </div>
       </section>
 
