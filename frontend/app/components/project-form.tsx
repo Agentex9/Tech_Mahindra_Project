@@ -131,7 +131,7 @@ export function ProjectForm({
       </div>
 
       <label className="field">
-        <span>Descripcion</span>
+        <span>Descripción</span>
         <textarea
           rows={5}
           value={form.description}

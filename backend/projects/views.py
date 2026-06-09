@@ -74,7 +74,7 @@ class IssuePermission(BasePermission):
         user = request.user
         if not user or not user.is_authenticated:
             return False
-        if request.method in SAFE_METHODS or request.method == 'POST':
+        if request.method in SAFE_METHODS or request.method in ('POST', 'PATCH'):
             return True
         return getattr(user, 'is_privileged_role', False)
 

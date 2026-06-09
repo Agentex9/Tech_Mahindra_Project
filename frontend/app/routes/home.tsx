@@ -24,7 +24,7 @@ export default function Home() {
 
     const normalizedUsername = username.trim();
     if (!normalizedUsername || !password) {
-      toast.error("Completa usuario y contrasena.");
+      toast.error("Completa usuario y contraseña.");
       return;
     }
 
@@ -38,7 +38,7 @@ export default function Home() {
       setPassword("");
       navigate(getDefaultDashboardPath(payload.user), { replace: true });
     } catch (error) {
-      toast.error(error instanceof Error ? error.message : "No se pudo iniciar sesion.");
+      toast.error(error instanceof Error ? error.message : "No se pudo iniciar sesión.");
     } finally {
       setIsSubmitting(false);
     }
@@ -53,7 +53,7 @@ export default function Home() {
           </div>
           <div>
             <p className="brand-label">WorkTrack</p>
-            <h1>Iniciar sesion</h1>
+            <h1>Iniciar sesión</h1>
           </div>
         </div>
 
@@ -70,7 +70,7 @@ export default function Home() {
           </label>
 
           <label className="field">
-            <span>Contrasena</span>
+            <span>Contraseña</span>
             <input
               autoComplete="current-password"
               required

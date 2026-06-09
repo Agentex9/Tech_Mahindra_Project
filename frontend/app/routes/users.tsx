@@ -63,7 +63,7 @@ function toForm(user: AuthUser): UserFormState {
 export function meta() {
   return [
     { title: "WorkTrack | Usuarios" },
-    { name: "description", content: "Administracion de usuarios." },
+    { name: "description", content: "Administración de usuarios." },
   ];
 }
 
@@ -217,7 +217,7 @@ export default function UsersPage() {
       <section className="dashboard-content">
         <section className="simple-panel empty-state-card">
           <h3>Acceso restringido</h3>
-          <p>Solo Admin puede ver esta seccion.</p>
+          <p>Solo Admin puede ver esta sección.</p>
         </section>
       </section>
     );
@@ -367,7 +367,7 @@ export default function UsersPage() {
         <div className="panel-header panel-header-start">
           <div>
             <h2>Usuarios registrados</h2>
-            <p className="muted-copy">Puedes cambiar rol, activar/desactivar y ajustar puntos desde aqui.</p>
+            <p className="muted-copy">Puedes cambiar rol, activar/desactivar y ajustar puntos desde aquí.</p>
           </div>
         </div>
         {isLoading ? <div className="status muted">Cargando usuarios...</div> : null}

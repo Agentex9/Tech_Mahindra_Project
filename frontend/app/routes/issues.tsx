@@ -4,6 +4,7 @@ import { Link } from "react-router";
 import { Modal } from "../components/modal";
 import { ListControls, paginate } from "../components/list-controls";
 import { GradientColorPicker } from "../components/gradient-color-picker";
+import { StatusSelect } from "../components/status-select";
 import { useToast } from "../components/toast-provider";
 import {
   createLabel,
@@ -14,6 +15,7 @@ import {
   fetchUsers,
   getIssueStatusOptions,
   ISSUE_STATUSES,
+  patchIssueStatus,
   updateIssue,
   type AuthUser,
   type Issue,
@@ -152,6 +154,7 @@ export default function IssuesPage() {
   const [editingIssueId, setEditingIssueId] = useState<string | null>(null);
   const [isLoading, setIsLoading] = useState(true);
   const [isSaving, setIsSaving] = useState(false);
+  const [savingStatusId, setSavingStatusId] = useState<string | null>(null);
   const [form, setForm] = useState<IssueCreateFormState>(EMPTY_FORM);
   const [labelForm, setLabelForm] = useState<LabelCreateFormState>(EMPTY_LABEL_FORM);
   const [page, setPage] = useState(1);
@@ -215,7 +218,7 @@ export default function IssuesPage() {
     event.preventDefault();
 
     if (!form.project || !form.title.trim()) {
-      toast.error("Completa proyecto y titulo.");
+      toast.error("Completa proyecto y título.");
       return;
     }
 
@@ -262,13 +265,25 @@ export default function IssuesPage() {
     }
   }
 
+  async function handleIssueStatusChange(issue: Issue, newStatus: string) {
+    setSavingStatusId(issue.issue_id);
+    try {
+      await patchIssueStatus(token, issue.issue_id, newStatus);
+      await loadIssues();
+    } catch (error) {
+      toast.error(error instanceof Error ? error.message : "No fue posible cambiar el estado.");
+    } finally {
+      setSavingStatusId(null);
+    }
+  }
+
   return (
     <section className="dashboard-content">
       <section className="hero-banner compact">
         <div>
           <span className="hero-kicker">Issues</span>
           <h1>{isDeveloper(user) ? "Tus issues asignados" : "Todos los issues del portafolio"}</h1>
-          <p className="subtle-copy">Aqui tambien puedes crear issues y asignarlos directamente a un proyecto.</p>
+          <p className="subtle-copy">Aquí también puedes crear issues y asignarlos directamente a un proyecto.</p>
         </div>
         {!isDeveloper(user) ? (
           <div className="hero-actions">
@@ -395,12 +410,17 @@ export default function IssuesPage() {
           return (
             <article className="portfolio-card issue-card" key={issue.issue_id}>
               <div className="portfolio-card-top">
-                <span className={`status-pill status-${issue.status.toLowerCase().replaceAll(" ", "-")}`}>{issue.status}</span>
+                <StatusSelect
+                  currentStatus={issue.status}
+                  isSaving={savingStatusId === issue.issue_id}
+                  options={getIssueStatusOptions(issue.status, isDeveloper(user))}
+                  onChange={(s) => void handleIssueStatusChange(issue, s)}
+                />
                 <span className="muted-inline">{issue.priority || "Sin prioridad"}</span>
               </div>
               <div className="portfolio-card-body">
                 <h3>{issue.title}</h3>
-                <p>{issue.description || "Sin descripcion."}</p>
+                <p>{issue.description || "Sin descripción."}</p>
               </div>
               <dl className="project-facts project-facts-single">
                 <div>
@@ -466,11 +486,11 @@ export default function IssuesPage() {
               </select>
             </label>
             <label className="field">
-              <span>Titulo</span>
+              <span>Título</span>
               <input required type="text" value={form.title} onChange={(event) => setForm((current) => ({ ...current, title: event.target.value }))} />
             </label>
             <label className="field">
-              <span>Descripcion</span>
+              <span>Descripción</span>
               <textarea rows={4} value={form.description} onChange={(event) => setForm((current) => ({ ...current, description: event.target.value }))} />
             </label>
             <div className="form-grid form-grid-3">
@@ -501,7 +521,7 @@ export default function IssuesPage() {
                 </select>
               </label>
               <label className="field">
-                <span>Tipo de asignacion</span>
+                <span>Tipo de asignación</span>
                 <select value={form.assignment_type} onChange={(event) => setForm((current) => ({ ...current, assignment_type: event.target.value }))}>
                   <option value="">Sin definir</option>
                   {ASSIGNMENT_TYPE_OPTIONS.map((option) => (
@@ -536,7 +556,7 @@ export default function IssuesPage() {
                 </select>
               </label>
               <label className="field">
-                <span>Fecha limite</span>
+                <span>Fecha límite</span>
                 <input type="date" value={form.due_date} onChange={(event) => setForm((current) => ({ ...current, due_date: event.target.value }))} />
               </label>
               <label className="field">

@@ -27,6 +27,8 @@ import {
   fetchProjectSprints,
   fetchUsers,
   getIssueStatusOptions,
+  getProjectStatusOptions,
+  patchIssueStatus,
   updateIssue,
   updateProject,
   updateProjectFinancial,
@@ -49,6 +51,7 @@ import {
   type SprintPayload,
 } from "../lib/api";
 import { GradientColorPicker } from "../components/gradient-color-picker";
+import { StatusSelect } from "../components/status-select";
 import { isDeveloper } from "../lib/auth";
 import { useDashboardContext } from "../lib/dashboard";
 import { formatShortSpanishDate, formatShortSpanishDateTime } from "../lib/date";
@@ -391,7 +394,7 @@ function PlanningForm({
       </div>
       <div className="form-grid">
         <label className="field">
-          <span>Metodologia</span>
+          <span>Metodología</span>
           <input
             type="text"
             value={form.methodology}
@@ -666,7 +669,7 @@ function IssueFormView({
   return (
     <form className="stack-form" onSubmit={onSubmit}>
       <label className="field">
-        <span>Titulo</span>
+        <span>Título</span>
         <input
           required
           type="text"
@@ -675,7 +678,7 @@ function IssueFormView({
         />
       </label>
       <label className="field">
-        <span>Descripcion</span>
+        <span>Descripción</span>
         <textarea
           rows={4}
           value={form.description}
@@ -720,7 +723,7 @@ function IssueFormView({
       </div>
       <div className="form-grid form-grid-3">
         <label className="field">
-          <span>Asignacion</span>
+          <span>Asignación</span>
           <select
             value={form.assignment_type}
             onChange={(event) => onChange({ ...form, assignment_type: event.target.value })}
@@ -756,7 +759,7 @@ function IssueFormView({
           </select>
         </label>
         <label className="field">
-          <span>Fecha limite</span>
+          <span>Fecha límite</span>
           <input
             type="date"
             value={form.due_date}
@@ -836,6 +839,8 @@ export default function ProjectDetail({ params }: { params: { projectId: string 
   const [isLoading, setIsLoading] = useState(true);
   const [isSaving, setIsSaving] = useState(false);
   const [isDeleting, setIsDeleting] = useState(false);
+  const [savingIssueStatusId, setSavingIssueStatusId] = useState<string | null>(null);
+  const [savingProjectStatus, setSavingProjectStatus] = useState(false);
   const [error, setError] = useState<string | null>(null);
   const [modal, setModal] = useState<string | null>(null);
   const [moduleListState, setModuleListState] = useState(INITIAL_MODULE_LIST_STATE);
@@ -1052,10 +1057,10 @@ export default function ProjectDetail({ params }: { params: { projectId: string 
         await createProjectPlanning(token, toPlanningPayload(planningForm, project.project_id));
       }
       setPlannings(await fetchProjectPlannings(token, project.project_id));
-      toast.success(editingPlanningId ? "Planeacion actualizada." : "Planeacion creada.");
+      toast.success(editingPlanningId ? "Planeación actualizada." : "Planeación creada.");
       closeModal();
     } catch (saveError) {
-      toast.error(saveError instanceof Error ? saveError.message : "No fue posible guardar la planeacion.");
+      toast.error(saveError instanceof Error ? saveError.message : "No fue posible guardar la planeación.");
     } finally {
       setIsSaving(false);
     }
@@ -1074,7 +1079,7 @@ export default function ProjectDetail({ params }: { params: { projectId: string 
       toast.success("Planeacion eliminada.");
       closeModal();
     } catch (deleteError) {
-      toast.error(deleteError instanceof Error ? deleteError.message : "No fue posible eliminar la planeacion.");
+      toast.error(deleteError instanceof Error ? deleteError.message : "No fue posible eliminar la planeación.");
     } finally {
       setIsDeleting(false);
     }
@@ -1280,6 +1285,39 @@ export default function ProjectDetail({ params }: { params: { projectId: string 
     }
   }
 
+  async function handleProjectStatusChange(newStatus: string) {
+    if (!project) return;
+    setSavingProjectStatus(true);
+    try {
+      const updated = await updateProject(token, project.project_id, {
+        client: project.client,
+        description: project.description,
+        name: project.name,
+        project_manager: project.project_manager,
+        project_type: project.project_type,
+        status: newStatus,
+      });
+      setProject(updated);
+    } catch (error) {
+      toast.error(error instanceof Error ? error.message : "No fue posible cambiar el estado.");
+    } finally {
+      setSavingProjectStatus(false);
+    }
+  }
+
+  async function handleIssueStatusChange(issue: Issue, newStatus: string) {
+    if (!project) return;
+    setSavingIssueStatusId(issue.issue_id);
+    try {
+      await patchIssueStatus(token, issue.issue_id, newStatus);
+      setIssues(await fetchProjectIssues(token, project.project_id));
+    } catch (error) {
+      toast.error(error instanceof Error ? error.message : "No fue posible cambiar el estado.");
+    } finally {
+      setSavingIssueStatusId(null);
+    }
+  }
+
   return (
     <>
       <section className="dashboard-content">
@@ -1301,9 +1339,12 @@ export default function ProjectDetail({ params }: { params: { projectId: string 
                 <p className="subtle-copy">{project.client || "Sin cliente"}</p>
               </div>
               <div className="hero-actions">
-                <span className={`status-pill status-${project.status.toLowerCase().replaceAll(" ", "-")}`}>
-                  {project.status}
-                </span>
+                <StatusSelect
+                  currentStatus={project.status}
+                  isSaving={savingProjectStatus}
+                  options={getProjectStatusOptions(project.status)}
+                  onChange={(s) => void handleProjectStatusChange(s)}
+                />
                 {!dev ? (
                   <>
                     <button className="secondary-button" onClick={() => setModal("project-edit")} type="button">
@@ -1320,7 +1361,7 @@ export default function ProjectDetail({ params }: { params: { projectId: string 
             <section className="detail-grid-page">
               <article className="simple-panel">
                 <h2>Descripcion</h2>
-                <p className="muted-copy">{project.description || "Sin descripcion."}</p>
+                <p className="muted-copy">{project.description || "Sin descripción."}</p>
               </article>
 
               <article className="simple-panel">
@@ -1393,11 +1434,11 @@ export default function ProjectDetail({ params }: { params: { projectId: string 
                     }}
                     type="button"
                   >
-                    Nueva planeacion
+                    Nueva planeación
                   </button>
                 }
-                description="Fechas, metodologia y alcance."
-                title="Planeacion"
+                description="Fechas, metodología y alcance."
+                title="Planeación"
               >
                 <ListControls
                   end={planningPage.end}
@@ -1448,7 +1489,7 @@ export default function ProjectDetail({ params }: { params: { projectId: string 
                           </div>
                         </div>
                         <p className="muted-copy">
-                          {planning.methodology || "Sin metodologia"} · {planning.estimated_sprint_count} sprints
+                          {planning.methodology || "Sin metodología"} · {planning.estimated_sprint_count} sprints
                         </p>
                       </article>
                     ))}
@@ -1743,9 +1784,12 @@ export default function ProjectDetail({ params }: { params: { projectId: string 
                           </div>
                         </div>
                         <div className="module-item-meta">
-                          <span className={`status-pill status-${issue.status.toLowerCase().replaceAll(" ", "-")}`}>
-                            {issue.status}
-                          </span>
+                          <StatusSelect
+                            currentStatus={issue.status}
+                            isSaving={savingIssueStatusId === issue.issue_id}
+                            options={getIssueStatusOptions(issue.status, dev)}
+                            onChange={(s) => void handleIssueStatusChange(issue, s)}
+                          />
                           <span>Limite: {issue.due_date ? formatShortSpanishDate(issue.due_date) : "Sin fecha"}</span>
                           <span>Asignado: {issue.assigned_to === null ? "Sin asignar" : (() => { const u = users.find((u) => u.id === issue.assigned_to); if (!u) return `Usuario #${issue.assigned_to}`; const full = `${u.first_name} ${u.last_name}`.trim(); return full || u.username; })()}</span>
                         </div>
@@ -1790,11 +1834,11 @@ export default function ProjectDetail({ params }: { params: { projectId: string 
       ) : null}
 
       {modal === "planning-create" || modal === "planning-edit" ? (
-        <Modal onClose={closeModal} title={editingPlanningId ? "Editar planeacion" : "Nueva planeacion"}>
+        <Modal onClose={closeModal} title={editingPlanningId ? "Editar planeación" : "Nueva planeación"}>
           <PlanningForm
             form={planningForm}
             isSaving={isSaving}
-            submitLabel={editingPlanningId ? "Guardar cambios" : "Crear planeacion"}
+            submitLabel={editingPlanningId ? "Guardar cambios" : "Crear planeación"}
             onChange={setPlanningForm}
             onSubmit={handleSavePlanning}
           />
@@ -1802,9 +1846,9 @@ export default function ProjectDetail({ params }: { params: { projectId: string 
       ) : null}
 
       {modal === "planning-delete" ? (
-        <Modal onClose={closeModal} title="Eliminar planeacion">
+        <Modal onClose={closeModal} title="Eliminar planeación">
           <div className="confirm-block">
-            <p>Se eliminara esta planeacion.</p>
+            <p>Se eliminará esta planeación.</p>
             <div className="confirm-actions">
               <button className="secondary-button" onClick={closeModal} type="button">
                 Cancelar
@@ -1860,7 +1904,7 @@ export default function ProjectDetail({ params }: { params: { projectId: string 
       {modal === "risk-delete" ? (
         <Modal onClose={closeModal} title="Eliminar riesgo">
           <div className="confirm-block">
-            <p>Se eliminara este riesgo.</p>
+            <p>Se eliminará este riesgo.</p>
             <div className="confirm-actions">
               <button className="secondary-button" onClick={closeModal} type="button">
                 Cancelar
@@ -1888,7 +1932,7 @@ export default function ProjectDetail({ params }: { params: { projectId: string 
       {modal === "sprint-delete" ? (
         <Modal onClose={closeModal} title="Eliminar sprint">
           <div className="confirm-block">
-            <p>Se eliminara este sprint.</p>
+            <p>Se eliminará este sprint.</p>
             <div className="confirm-actions">
               <button className="secondary-button" onClick={closeModal} type="button">
                 Cancelar
@@ -1919,7 +1963,7 @@ export default function ProjectDetail({ params }: { params: { projectId: string 
       {modal === "issue-delete" ? (
         <Modal onClose={closeModal} title="Eliminar issue">
           <div className="confirm-block">
-            <p>Se eliminara este issue.</p>
+            <p>Se eliminará este issue.</p>
             <div className="confirm-actions">
               <button className="secondary-button" onClick={closeModal} type="button">
                 Cancelar

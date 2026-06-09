@@ -57,7 +57,7 @@ export default function DashboardHome() {
           <span className="hero-kicker">Resumen ejecutivo</span>
           <h1>Monitorea proyectos, issues y subastas desde un solo flujo.</h1>
           <p className="subtle-copy">
-            La vista principal consolida el portafolio operativo y deja a mano las acciones clave del dia.
+            La vista principal consolida el portafolio operativo y deja a mano las acciones clave del día.
           </p>
         </div>
         <div className="hero-actions">
@@ -93,8 +93,8 @@ export default function DashboardHome() {
         <article className="simple-panel">
           <div className="panel-header panel-header-start">
             <div>
-              <h2>Ultimos proyectos</h2>
-              <p className="muted-copy">Los registros mas recientes del portafolio.</p>
+              <h2>Últimos proyectos</h2>
+              <p className="muted-copy">Los registros más recientes del portafolio.</p>
             </div>
           </div>
           <div className="mini-project-list">
@@ -113,7 +113,7 @@ export default function DashboardHome() {
         <article className="simple-panel">
           <div className="panel-header panel-header-start">
             <div>
-              <h2>Atencion inmediata</h2>
+              <h2>Atención inmediata</h2>
               <p className="muted-copy">Issues no resueltos y subastas que siguen activas.</p>
             </div>
           </div>

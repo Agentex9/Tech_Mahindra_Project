@@ -208,12 +208,12 @@ export default function AuctionPage() {
 
   async function handleBidSubmit() {
     if (!selectedCard?.auction) {
-      toast.error("Este issue aun no tiene una subasta activa.");
+      toast.error("Este issue aún no tiene una subasta activa.");
       return;
     }
 
     if (selectedCard.auction.status === "Completed") {
-      toast.error("Esta subasta ya esta cerrada.");
+      toast.error("Esta subasta ya está cerrada.");
       setSelectedCard(null);
       return;
     }
@@ -222,12 +222,12 @@ export default function AuctionPage() {
     const nextAmount = Number(bidAmount);
 
     if (!Number.isFinite(nextAmount) || nextAmount <= 0 || !Number.isInteger(nextAmount)) {
-      toast.error("Escribe una oferta valida en puntos enteros.");
+      toast.error("Escribe una oferta válida en puntos enteros.");
       return;
     }
 
     if (topBid && nextAmount < Number(topBid.bid_amount)) {
-      toast.error("La nueva oferta no puede ser menor a la mas alta actual.");
+      toast.error("La nueva oferta no puede ser menor a la más alta actual.");
       return;
     }
 
@@ -344,7 +344,7 @@ export default function AuctionPage() {
         {!isLoading && filteredBiddingCards.length === 0 ? (
           <div className="empty-state-card auction-empty-state">
             <h3>Sin issues en bidding</h3>
-            <p>No hay issues con asignacion por subasta en este momento.</p>
+            <p>No hay issues con asignación por subasta en este momento.</p>
           </div>
         ) : null}
         {paginatedBiddingCards.items.map((card) => (
@@ -355,7 +355,7 @@ export default function AuctionPage() {
             </div>
             <div className="portfolio-card-body">
               <h3>{card.issue.title}</h3>
-              <p>{card.issue.description || "Sin descripcion."}</p>
+              <p>{card.issue.description || "Sin descripción."}</p>
             </div>
             <dl className="project-facts project-facts-single">
               <div>
@@ -414,7 +414,7 @@ export default function AuctionPage() {
               </p>
             </div>
             <p>
-              Oferta mas alta actual: <strong>{selectedCard.topBid?.bid_amount ?? "Sin ofertas"}</strong>
+              Oferta más alta actual: <strong>{selectedCard.topBid?.bid_amount ?? "Sin ofertas"}</strong>
             </p>
             <label className="field">
               <span>Monto</span>

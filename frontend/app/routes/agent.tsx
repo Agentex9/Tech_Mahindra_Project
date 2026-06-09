@@ -64,7 +64,7 @@ export default function AgentPage() {
         top_k: 5,
       });
       setResult(response);
-      toast.success(response.mode === "llm" ? "Analisis generado." : "Preview del agente generado.");
+      toast.success(response.mode === "llm" ? "Análisis generado." : "Preview del agente generado.");
     } catch (error) {
       toast.error(error instanceof Error ? error.message : "No fue posible consultar el agente.");
     } finally {
@@ -125,7 +125,7 @@ export default function AgentPage() {
         <section className={`agent-sync-status sync-status-${syncStatus}`}>
           <div className="agent-sync-status-header">
             <div>
-              <strong>Indice RAG</strong>
+              <strong>Índice RAG</strong>
               <p>{syncStatus === "success" && syncedDocumentCount ? `${syncedDocumentCount} documentos sincronizados` : "Base semantica para enriquecer respuestas"}</p>
             </div>
             <span>{syncStatus === "idle" ? "Sin ejecuciones recientes" : syncStatus === "running" ? "En progreso" : syncFinishedAt}</span>
@@ -136,7 +136,7 @@ export default function AgentPage() {
           {syncStatus === "running" ? (
             <div className="agent-sync-progress">
               <span />
-              <p>Actualizando coleccion y documentos...</p>
+              <p>Actualizando colección y documentos...</p>
             </div>
           ) : null}
           {syncStatus === "success" && syncResult ? (
@@ -144,7 +144,7 @@ export default function AgentPage() {
               <p>{syncResult.detail}</p>
               {syncResult.output ? (
                 <details>
-                  <summary>Ver detalle tecnico</summary>
+                  <summary>Ver detalle técnico</summary>
                   <pre>{syncResult.output.trim()}</pre>
                 </details>
               ) : null}
@@ -183,7 +183,7 @@ export default function AgentPage() {
           <div className="panel-header panel-header-start">
             <div>
               <h2>Resultado</h2>
-              <p className="muted-copy">El analisis combina metricas del workspace con contexto operativo disponible.</p>
+              <p className="muted-copy">El análisis combina métricas del workspace con contexto operativo disponible.</p>
             </div>
           </div>
 
@@ -210,7 +210,7 @@ export default function AgentPage() {
 
               <section className={`agent-answer-card ${result.mode === "llm" ? "agent-answer-card-live" : "agent-answer-card-preview"}`}>
                 <div>
-                  <span>{result.mode === "llm" ? "Analisis LLM" : "Resumen preliminar"}</span>
+                  <span>{result.mode === "llm" ? "Análisis LLM" : "Resumen preliminar"}</span>
                   <strong>{result.mode === "llm" ? "Respuesta generada" : "Proveedor LLM no disponible"}</strong>
                 </div>
                 <p>{result.answer}</p>
@@ -227,11 +227,11 @@ export default function AgentPage() {
                 <div className="agent-context-heading">
                   <div>
                     <h3>Fuentes usadas</h3>
-                    <p>{result.context_snippets.length} fragmentos recuperados del indice RAG</p>
+                    <p>{result.context_snippets.length} fragmentos recuperados del índice RAG</p>
                   </div>
                 </div>
                 {result.context_snippets.length === 0 ? (
-                  <p className="muted-copy">Todavia no hay fragmentos RAG disponibles.</p>
+                  <p className="muted-copy">Todavía no hay fragmentos RAG disponibles.</p>
                 ) : (
                   <div className="agent-source-grid">
                     {result.context_snippets.map((snippet, index) => (
@@ -255,7 +255,7 @@ export default function AgentPage() {
             </div>
           ) : (
             <div className="empty-state-card agent-empty-state">
-              <h3>Sin consulta todavia</h3>
+              <h3>Sin consulta todavía</h3>
               <p>Escribe una pregunta para revisar riesgos, bloqueos o prioridades del portafolio.</p>
             </div>
           )}

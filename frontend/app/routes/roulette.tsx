@@ -142,7 +142,7 @@ export default function RoulettePage() {
     const amount = Number(betAmount);
 
     if (!Number.isFinite(amount) || amount <= 0) {
-      toast.error("Escribe una apuesta valida.");
+      toast.error("Escribe una apuesta válida.");
       return;
     }
 
@@ -269,12 +269,12 @@ export default function RoulettePage() {
           <div className="panel-header panel-header-start">
             <div>
               <h2>Apuesta</h2>
-              <p className="muted-copy">Selecciona la opcion y define el monto.</p>
+              <p className="muted-copy">Selecciona la opción y define el monto.</p>
             </div>
           </div>
           <div className="roulette-selection-card">
             <div>
-              <span className="simple-label">Seleccion actual</span>
+              <span className="simple-label">Selección actual</span>
               <strong>{selectedOptionConfig.label}</strong>
             </div>
             <div className="roulette-selection-meta">
@@ -351,7 +351,7 @@ export default function RoulettePage() {
               </div>
             </article>
           ))}
-          {history.length === 0 ? <p className="muted-copy">Todavia no hay giros registrados.</p> : null}
+          {history.length === 0 ? <p className="muted-copy">Todavía no hay giros registrados.</p> : null}
         </div>
       </section>
 

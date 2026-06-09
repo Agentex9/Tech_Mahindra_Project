@@ -655,6 +655,10 @@ export function updateIssue(token: string, issueId: string, payload: IssuePayloa
   return update<Issue, IssuePayload>(token, `/projects/issues/${issueId}/`, payload);
 }
 
+export function patchIssueStatus(token: string, issueId: string, status: string) {
+  return patch<Issue, { status: string }>(token, `/projects/issues/${issueId}/`, { status });
+}
+
 export function updateIssueLabels(token: string, issueId: string, labels: string[]) {
   return patch<Issue, Pick<IssuePayload, "labels">>(token, `/projects/issues/${issueId}/`, { labels });
 }

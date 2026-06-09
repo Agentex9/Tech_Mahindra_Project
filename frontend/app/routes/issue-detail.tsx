@@ -3,6 +3,7 @@ import { Link, useNavigate } from "react-router";
 
 import { Modal } from "../components/modal";
 import { ListControls, paginate } from "../components/list-controls";
+import { StatusSelect } from "../components/status-select";
 import { useToast } from "../components/toast-provider";
 import {
   createIssueComment,
@@ -13,6 +14,7 @@ import {
   fetchUsers,
   getIssueStatusOptions,
   ISSUE_STATUSES,
+  patchIssueStatus,
   updateIssue,
   updateIssueLabels,
   type AuthUser,
@@ -107,6 +109,7 @@ export default function IssueDetailPage({ params }: { params: { issueId: string 
   const [isLoading, setIsLoading] = useState(true);
   const [isSavingLabels, setIsSavingLabels] = useState(false);
   const [isSavingComment, setIsSavingComment] = useState(false);
+  const [isSavingStatus, setIsSavingStatus] = useState(false);
   const [isEditing, setIsEditing] = useState(false);
   const [isSavingEdit, setIsSavingEdit] = useState(false);
   const [editForm, setEditForm] = useState<IssueEditFormState | null>(null);
@@ -226,6 +229,20 @@ export default function IssueDetailPage({ params }: { params: { issueId: string 
     setIsEditing(true);
   }
 
+  async function handleStatusChange(newStatus: string) {
+    if (!issue) return;
+    setIsSavingStatus(true);
+    try {
+      const updated = await patchIssueStatus(token, issue.issue_id, newStatus);
+      setIssue(updated);
+      toast.success("Estado actualizado.");
+    } catch (error) {
+      toast.error(error instanceof Error ? error.message : "No fue posible cambiar el estado.");
+    } finally {
+      setIsSavingStatus(false);
+    }
+  }
+
   return (
     <section className="dashboard-content">
       <div className="detail-back">
@@ -248,11 +265,18 @@ export default function IssueDetailPage({ params }: { params: { issueId: string 
               <p className="subtle-copy">{issue.description || "Sin descripción."}</p>
             </div>
             <div className="hero-actions">
-              <span className={`status-pill status-${issue.status.toLowerCase().replaceAll(" ", "-")}`}>{issue.status}</span>
+              <StatusSelect
+                currentStatus={issue.status}
+                isSaving={isSavingStatus}
+                options={getIssueStatusOptions(issue.status, dev)}
+                onChange={(s) => void handleStatusChange(s)}
+              />
               {issue.priority ? <span className="status-pill">{issue.priority}</span> : null}
-              <button className="secondary-button" onClick={openEdit} type="button">
-                Editar
-              </button>
+              {!dev ? (
+                <button className="secondary-button" onClick={openEdit} type="button">
+                  Editar
+                </button>
+              ) : null}
             </div>
           </section>
 
@@ -389,7 +413,7 @@ export default function IssueDetailPage({ params }: { params: { issueId: string 
             <Modal onClose={() => !isSavingEdit && setIsEditing(false)} title="Editar issue">
               <form className="stack-form" onSubmit={handleSaveEdit}>
                 <label className="field">
-                  <span>Titulo</span>
+                  <span>Título</span>
                   <input
                     required
                     type="text"
@@ -398,7 +422,7 @@ export default function IssueDetailPage({ params }: { params: { issueId: string 
                   />
                 </label>
                 <label className="field">
-                  <span>Descripcion</span>
+                  <span>Descripción</span>
                   <textarea
                     rows={4}
                     value={editForm.description}
@@ -429,7 +453,7 @@ export default function IssueDetailPage({ params }: { params: { issueId: string 
                     </select>
                   </label>
                   <label className="field">
-                    <span>Tipo de asignacion</span>
+                    <span>Tipo de asignación</span>
                     <select
                       value={editForm.assignment_type}
                       onChange={(e) => setEditForm((f) => f && ({ ...f, assignment_type: e.target.value }))}
@@ -454,7 +478,7 @@ export default function IssueDetailPage({ params }: { params: { issueId: string 
                     </select>
                   </label>
                   <label className="field">
-                    <span>Fecha limite</span>
+                    <span>Fecha límite</span>
                     <input
                       type="date"
                       value={editForm.due_date}

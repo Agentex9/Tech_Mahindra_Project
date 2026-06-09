@@ -232,6 +232,23 @@ code {
   transition: border-color 140ms ease, box-shadow 140ms ease;
 }
 
+.field select {
+  appearance: none;
+  padding-right: 2.25rem;
+  background-image: url("data:image/svg+xml,%3Csvg xmlns='http://www.w3.org/2000/svg' width='10' height='6' viewBox='0 0 10 6'%3E%3Cpath fill='currentColor' d='M0 0l5 6 5-6z'/%3E%3C/svg%3E");
+  background-repeat: no-repeat;
+  background-position: right 0.75rem center;
+  background-size: 0.6rem;
+  cursor: pointer;
+}
+
+.list-page-size select {
+  appearance: auto;
+  padding-right: 0.95rem;
+  background-image: none;
+  cursor: default;
+}
+
 .field input:focus,
 .field select:focus,
 .field textarea:focus {
@@ -721,6 +738,22 @@ code {
   background: #ffffff;
   font-size: 0.84rem;
   white-space: nowrap;
+}
+
+.status-quick-select {
+  appearance: none;
+  cursor: pointer;
+  padding-right: 1.75rem;
+  background-image: url("data:image/svg+xml,%3Csvg xmlns='http://www.w3.org/2000/svg' width='10' height='6' viewBox='0 0 10 6'%3E%3Cpath fill='currentColor' d='M0 0l5 6 5-6z'/%3E%3C/svg%3E");
+  background-repeat: no-repeat;
+  background-position: right 0.55rem center;
+  background-size: 0.55rem;
+  background-color: inherit;
+}
+
+.status-quick-select:disabled {
+  cursor: not-allowed;
+  opacity: 0.65;
 }
 
 .status-not-started {

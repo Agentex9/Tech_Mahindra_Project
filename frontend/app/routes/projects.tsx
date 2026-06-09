@@ -4,6 +4,7 @@ import { Link } from "react-router";
 import { ListControls, paginate } from "../components/list-controls";
 import { Modal } from "../components/modal";
 import { ProjectForm, type ProjectFormState } from "../components/project-form";
+import { StatusSelect } from "../components/status-select";
 import { useToast } from "../components/toast-provider";
 import {
   createProjectPlanning,
@@ -12,6 +13,7 @@ import {
   fetchProjectPlannings,
   fetchProjects,
   fetchUsers,
+  getProjectStatusOptions,
   PROJECT_STATUSES,
   updateProject,
   updateProjectPlanning,
@@ -84,7 +86,7 @@ function userLabel(users: AuthUser[], id: number | null): string {
 
 function truncate(value: string | null | undefined, limit = 150) {
   if (!value) {
-    return "Sin descripcion.";
+    return "Sin descripción.";
   }
 
   return value.length > limit ? `${value.slice(0, limit - 3)}...` : value;
@@ -93,7 +95,7 @@ function truncate(value: string | null | undefined, limit = 150) {
 export function meta() {
   return [
     { title: "WorkTrack | Proyectos" },
-    { name: "description", content: "Gestion de proyectos y acciones masivas." },
+    { name: "description", content: "Gestión de proyectos y acciones masivas." },
   ];
 }
 
@@ -111,6 +113,7 @@ export default function Projects() {
   const [bulkStatus, setBulkStatus] = useState<string>("In Progress");
   const [isLoading, setIsLoading] = useState(true);
   const [isSaving, setIsSaving] = useState(false);
+  const [savingProjectStatusId, setSavingProjectStatusId] = useState<string | null>(null);
   const [modal, setModal] = useState<"create" | "edit" | "bulk-status" | "bulk-delete" | null>(null);
   const [page, setPage] = useState(1);
   const [pageSize, setPageSize] = useState(12);
@@ -260,7 +263,7 @@ export default function Projects() {
       setModal(null);
       await loadProjects();
     } catch (error) {
-      toast.error(error instanceof Error ? error.message : "No fue posible aplicar la accion masiva.");
+      toast.error(error instanceof Error ? error.message : "No fue posible aplicar la acción masiva.");
     } finally {
       setIsSaving(false);
     }
@@ -282,6 +285,25 @@ export default function Projects() {
       toast.error(error instanceof Error ? error.message : "No fue posible eliminar los proyectos seleccionados.");
     } finally {
       setIsSaving(false);
+    }
+  }
+
+  async function handleProjectStatusChange(project: Project, newStatus: string) {
+    setSavingProjectStatusId(project.project_id);
+    try {
+      await updateProject(token, project.project_id, {
+        client: project.client,
+        description: project.description,
+        name: project.name,
+        project_manager: project.project_manager,
+        project_type: project.project_type,
+        status: newStatus,
+      });
+      await loadProjects();
+    } catch (error) {
+      toast.error(error instanceof Error ? error.message : "No fue posible cambiar el estado.");
+    } finally {
+      setSavingProjectStatusId(null);
     }
   }
 
@@ -381,7 +403,12 @@ export default function Projects() {
                 <input checked={selectedIds.includes(project.project_id)} onChange={() => toggleSelection(project.project_id)} type="checkbox" />
                 <span>Seleccionar</span>
               </label>
-              <span className={`status-pill status-${project.status.toLowerCase().replaceAll(" ", "-")}`}>{project.status}</span>
+              <StatusSelect
+                currentStatus={project.status}
+                isSaving={savingProjectStatusId === project.project_id}
+                options={getProjectStatusOptions(project.status)}
+                onChange={(s) => void handleProjectStatusChange(project, s)}
+              />
             </div>
             <div className="portfolio-card-body">
               <h3>{project.name}</h3>
