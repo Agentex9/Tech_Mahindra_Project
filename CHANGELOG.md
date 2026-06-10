@@ -3,6 +3,45 @@
 Cambios relevantes del proyecto siguiendo Semantic Versioning.
 
 
+# [1.2.0](https://github.com/Agentex9/Tech_Mahindra_Project/compare/v1.1.0...v1.2.0) (2026-06-10)
+
+
+* **General:** Merge pull request #40 from Agentex9/dev ([](https://github.com/Agentex9/Tech_Mahindra_Project/commit/53a1f34be34ecc3848cef4f4874068b498627459)), closes [#40](https://github.com/Agentex9/Tech_Mahindra_Project/issues/40)
+
+
+### chore
+
+* **API:** add serializers and viewsets for projects ([](https://github.com/Agentex9/Tech_Mahindra_Project/commit/9d334fc46a8493fbac1ba520731064c34d9a435a))
+* **General:** updating progress ([](https://github.com/Agentex9/Tech_Mahindra_Project/commit/727c6ef78a0a280a918d9e7402414f73420aa5b5))
+* **Interfaz:** add issue details, labels, and fix sidebar ([](https://github.com/Agentex9/Tech_Mahindra_Project/commit/f43b30bc3a00aaf6d86dd4cd99d196356a5835c7))
+* **Interfaz:** fix frontend ui check functionality ([](https://github.com/Agentex9/Tech_Mahindra_Project/commit/2195e40d601f91c947b6e14183d07d9cedb6a5b2))
+
+
+### feat
+
+* **API:** add agent analysis and workspace improvements ([](https://github.com/Agentex9/Tech_Mahindra_Project/commit/be2e3d67e1b6361eef26a584e0d9839506496ba0))
+* **Docker:** add auction expiration worker ([](https://github.com/Agentex9/Tech_Mahindra_Project/commit/996af7d4c141055b1cb9542354a1f186e9ac7149))
+* **Interfaz:** improve project management pages ([](https://github.com/Agentex9/Tech_Mahindra_Project/commit/0d2362d83d2be9f47d72ceedd516d9cc978edb69))
+
+
+### fix
+
+* **API:** connect api roulette and transactions to the frontend ([](https://github.com/Agentex9/Tech_Mahindra_Project/commit/359c080a31ddbeec1f890c9dd7b0a111d9e79899))
+* **API:** fix path on projects app ([](https://github.com/Agentex9/Tech_Mahindra_Project/commit/743300a6282f50834a9c9d327679d18eb1b68864))
+* **Docker:** add entrypoint to run migrations ([](https://github.com/Agentex9/Tech_Mahindra_Project/commit/dae873e6b558f83e34a3513a08622bd9f4f46078))
+* **Docker:** allow public host through nginx ([](https://github.com/Agentex9/Tech_Mahindra_Project/commit/75236176f8b363057e9a6b136146d49c89345808))
+* **Docker:** fix docker un prod ([](https://github.com/Agentex9/Tech_Mahindra_Project/commit/b2e7bc91f05a46a0dd1633fdbd9558855de01167))
+* **Docker:** install frontend build dependencies ([](https://github.com/Agentex9/Tech_Mahindra_Project/commit/6fb86b7265d92432d9d58a71ace48ab45651a976))
+* **Docker:** modify default values ([](https://github.com/Agentex9/Tech_Mahindra_Project/commit/0f48c3db9a917643a68b6735e8f20ee2b245a251))
+* **Docker:** modify default values ([](https://github.com/Agentex9/Tech_Mahindra_Project/commit/fd381fe7c49e0d8e8a25347f487d38dd96e80b8c))
+* **Docker:** modify default values ([](https://github.com/Agentex9/Tech_Mahindra_Project/commit/2d53073577022425a54763a92426b821be3beaf8))
+* **Docker:** modify default values ([](https://github.com/Agentex9/Tech_Mahindra_Project/commit/14d213729e4ec6dff5f34bccf3b96e8d2718281b))
+* **Docker:** modify default values ([](https://github.com/Agentex9/Tech_Mahindra_Project/commit/8fb613902ab1c28e9a3e71acb10a6414193d7c80))
+* **Docker:** modify default values ([](https://github.com/Agentex9/Tech_Mahindra_Project/commit/5ae40032b6d4d399999514f0bb281ed80856f2fd))
+* **Docker:** serve frontend spa build ([](https://github.com/Agentex9/Tech_Mahindra_Project/commit/c28b6ebec3d5b4f1d84176ef6e26eafbf4b2f2fb))
+* **frontend:** fixed issues ([](https://github.com/Agentex9/Tech_Mahindra_Project/commit/ba8409ffd8b87d28675c8d013a11a1a50601a097))
+* **frontend:** fixed issues ([](https://github.com/Agentex9/Tech_Mahindra_Project/commit/e4683058a10519db3d8491d02552e2c25d6e0986))
+
 # [1.1.0](https://github.com/Agentex9/Tech_Mahindra_Project/compare/v1.0.4...v1.1.0) (2026-04-17)
 
 
