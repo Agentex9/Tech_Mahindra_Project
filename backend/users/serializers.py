@@ -1,6 +1,8 @@
 from django.contrib.auth import authenticate, get_user_model
 from rest_framework import serializers
 
+from .models import PointTransaction, RouletteSpin
+
 User = get_user_model()
 
 
@@ -19,6 +21,66 @@ class UserSerializer(serializers.ModelSerializer):
             'is_staff',
         )
         read_only_fields = fields
+
+
+class UserWriteSerializer(serializers.ModelSerializer):
+    password = serializers.CharField(write_only=True, required=False, allow_blank=False, style={'input_type': 'password'})
+
+    class Meta:
+        model = User
+        fields = (
+            'id',
+            'username',
+            'email',
+            'first_name',
+            'last_name',
+            'role',
+            'points_balance',
+            'is_active',
+            'password',
+        )
+        read_only_fields = ('id',)
+
+    def validate_role(self, value):
+        normalized = User.normalize_role(value)
+        valid_roles = {choice for choice, _label in User.RoleChoices.choices}
+        if normalized not in valid_roles:
+            raise serializers.ValidationError('Rol invalido. Usa Admin, PM o Developer.')
+        return normalized
+
+    def validate_points_balance(self, value):
+        if value < 0:
+            raise serializers.ValidationError('El balance de puntos no puede ser negativo.')
+        return value
+
+    def create(self, validated_data):
+        password = validated_data.pop('password', None)
+        role = validated_data.get('role', User.RoleChoices.DEVELOPER)
+        validated_data['is_staff'] = role == User.RoleChoices.ADMIN
+        user = User(**validated_data)
+        if password:
+            user.set_password(password)
+        else:
+            user.set_unusable_password()
+        user.save()
+        return user
+
+    def update(self, instance, validated_data):
+        password = validated_data.pop('password', None)
+        role = validated_data.get('role', instance.role)
+
+        for field, value in validated_data.items():
+            setattr(instance, field, value)
+
+        instance.role = self.validate_role(role)
+        if not instance.is_superuser:
+            instance.is_staff = instance.role == User.RoleChoices.ADMIN
+
+        if password:
+            instance.set_password(password)
+
+        instance.save()
+        return instance
 
 
 class LoginSerializer(serializers.Serializer):
@@ -48,3 +110,87 @@ class AuthSessionSerializer(serializers.Serializer):
     last_seen_at = serializers.DateTimeField(source='session_metadata.last_seen_at')
     token_key = serializers.CharField()
     user_agent = serializers.CharField(source='session_metadata.user_agent')
+
+
+class PointTransactionSerializer(serializers.ModelSerializer):
+    def validate_points(self, value):
+        if value == 0:
+            raise serializers.ValidationError('Los puntos no pueden ser 0.')
+        return value
+
+    def validate_type(self, value):
+        if not value or not str(value).strip():
+            raise serializers.ValidationError('El tipo de transaccion es requerido.')
+        return value
+
+    class Meta:
+        model = PointTransaction
+        fields = (
+            'transaction_id',
+            'user',
+            'points',
+            'type',
+            'issue_id',
+            'created_at',
+            'updated_at',
+            'created_by',
+            'updated_by',
+        )
+        read_only_fields = (
+            'transaction_id',
+            'user',
+            'created_at',
+            'updated_at',
+            'created_by',
+            'updated_by',
+        )
+
+class RouletteSpinSerializer(serializers.ModelSerializer):
+    def validate_points_won(self, value):
+        if value < 0:
+            raise serializers.ValidationError('Los puntos ganados no pueden ser negativos.')
+        return value
+
+    def validate_spin_cost(self, value):
+        if value <= 0:
+            raise serializers.ValidationError('El costo del giro debe ser mayor que 0.')
+        return value
+
+    class Meta:
+        model = RouletteSpin
+        fields = (
+            'spin_id',
+            'user',
+            'points_won',
+            'spin_cost',
+            'created_at',
+            'updated_at',
+            'created_by',
+            'updated_by',
+        )
+        read_only_fields = (
+            'spin_id',
+            'user',
+            'created_at',
+            'updated_at',
+            'created_by',
+            'updated_by',
+        )
+
+
+class RouletteSpinRequestSerializer(serializers.Serializer):
+    amount = serializers.IntegerField(min_value=1)
+    option = serializers.ChoiceField(choices=('red', 'black', 'green', 'even', 'odd', 'low', 'high'))
+
+
+class RouletteSpinResultSerializer(serializers.Serializer):
+    spin_id = serializers.UUIDField()
+    amount = serializers.IntegerField()
+    option = serializers.CharField()
+    result = serializers.IntegerField()
+    color = serializers.ChoiceField(choices=('green', 'red', 'black'))
+    won = serializers.BooleanField()
+    multiplier = serializers.IntegerField()
+    payout = serializers.IntegerField()
+    balance_after = serializers.IntegerField()
+    created_at = serializers.DateTimeField()

@@ -17,16 +17,27 @@ services:
     volumes:
       - postgres_data:/var/lib/postgresql/data
 
+  qdrant:
+    image: qdrant/qdrant:v1.18.0
+    container_name: worktrack_qdrant
+    restart: unless-stopped
+    ports:
+      - "${QDRANT_PORT:-6333}:6333"
+      - "${QDRANT_GRPC_PORT:-6334}:6334"
+    volumes:
+      - qdrant_data:/qdrant/storage
+
   backend:
     build:
       context: ..
       dockerfile: docker/backend.Dockerfile
     container_name: worktrack_backend
     restart: unless-stopped
-    command: sh -c "python manage.py migrate && python manage.py runserver 0.0.0.0:8000"
     depends_on:
       db:
         condition: service_healthy
+      qdrant:
+        condition: service_started
     environment:
       SECRET_KEY: ${SECRET_KEY:-django-dev-secret-key}
       DEBUG: ${DEBUG:-True}
@@ -37,8 +48,55 @@ services:
       DB_PASSWORD: ${DB_PASSWORD:-worktrack_password}
       DB_HOST: db
       DB_PORT: 5432
+      AGENT_LLM_PROVIDER: ${AGENT_LLM_PROVIDER:-gemini}
+      AGENT_LLM_MODEL: ${AGENT_LLM_MODEL:-gemini-3.5-flash}
+      AGENT_LLM_API_KEY: ${AGENT_LLM_API_KEY:-}
+      AGENT_LLM_BASE_URL: ${AGENT_LLM_BASE_URL:-}
+      AGENT_HTTP_TIMEOUT_SECONDS: ${AGENT_HTTP_TIMEOUT_SECONDS:-20}
+      AGENT_EMBEDDING_PROVIDER: ${AGENT_EMBEDDING_PROVIDER:-fastembed}
+      AGENT_EMBEDDING_MODEL: ${AGENT_EMBEDDING_MODEL:-BAAI/bge-small-en-v1.5}
+      AGENT_QDRANT_URL: ${AGENT_QDRANT_URL:-http://qdrant:6333}
+      AGENT_QDRANT_COLLECTION: ${AGENT_QDRANT_COLLECTION:-worktrack-knowledge}
+      AGENT_RAG_ENABLED: ${AGENT_RAG_ENABLED:-True}
     ports:
       - "8000:8000"
+    volumes:
+      - ../backend:/app/backend
+      - ../.env:/app/.env:ro
+
+  auction_worker:
+    build:
+      context: ..
+      dockerfile: docker/backend.Dockerfile
+    container_name: worktrack_auction_worker
+    restart: unless-stopped
+    command: sh -c "while true; do python manage.py process_expired_auctions; sleep $${AUCTION_WORKER_INTERVAL:-60}; done"
+    depends_on:
+      db:
+        condition: service_healthy
+      qdrant:
+        condition: service_started
+    environment:
+      SECRET_KEY: ${SECRET_KEY:-django-dev-secret-key}
+      DEBUG: ${DEBUG:-True}
+      ALLOWED_HOSTS: ${ALLOWED_HOSTS:-localhost,127.0.0.1,backend}
+      STATIC_URL: ${STATIC_URL:-static/}
+      DB_NAME: ${DB_NAME:-worktrack_db}
+      DB_USER: ${DB_USER:-worktrack_user}
+      DB_PASSWORD: ${DB_PASSWORD:-worktrack_password}
+      DB_HOST: db
+      DB_PORT: 5432
+      AGENT_LLM_PROVIDER: ${AGENT_LLM_PROVIDER:-gemini}
+      AGENT_LLM_MODEL: ${AGENT_LLM_MODEL:-gemini-3.5-flash}
+      AGENT_LLM_API_KEY: ${AGENT_LLM_API_KEY:-}
+      AGENT_LLM_BASE_URL: ${AGENT_LLM_BASE_URL:-}
+      AGENT_HTTP_TIMEOUT_SECONDS: ${AGENT_HTTP_TIMEOUT_SECONDS:-20}
+      AGENT_EMBEDDING_PROVIDER: ${AGENT_EMBEDDING_PROVIDER:-fastembed}
+      AGENT_EMBEDDING_MODEL: ${AGENT_EMBEDDING_MODEL:-BAAI/bge-small-en-v1.5}
+      AGENT_QDRANT_URL: ${AGENT_QDRANT_URL:-http://qdrant:6333}
+      AGENT_QDRANT_COLLECTION: ${AGENT_QDRANT_COLLECTION:-worktrack-knowledge}
+      AGENT_RAG_ENABLED: ${AGENT_RAG_ENABLED:-True}
+      AUCTION_WORKER_INTERVAL: ${AUCTION_WORKER_INTERVAL:-60}
     volumes:
       - ../backend:/app/backend
       - ../.env:/app/.env:ro
@@ -65,4 +123,5 @@ services:
 
 volumes:
   postgres_data:
+  qdrant_data:
   frontend_node_modules:

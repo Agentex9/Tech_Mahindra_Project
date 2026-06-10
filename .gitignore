@@ -424,6 +424,8 @@ sketch
 [Ss]cripts
 pyvenv.cfg
 pip-selfcheck.json
+!frontend/app/lib/
+!frontend/app/lib/**
 
 ### VisualStudioCode ###
 .vscode/*

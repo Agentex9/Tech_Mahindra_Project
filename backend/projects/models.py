@@ -114,7 +114,16 @@ class Issues(AuditModel):
         ('Manual', 'Manual'),
         ('Bidding', 'Bidding'),
     ]
-    
+
+    issue_status_choices = [
+        ('Not Started', 'Not Started'),
+        ('In Progress', 'In Progress'),
+        ('Review', 'Review'),
+        ('Completed', 'Completed'),
+        ('On Hold', 'On Hold'),
+        ('Cancelled', 'Cancelled'),
+    ]
+
     issue_id = models.UUIDField(primary_key=True, default=uuid4, editable=False)
     project = models.ForeignKey(Projects, on_delete=models.CASCADE, related_name='issues')
     title = models.CharField(max_length=255)
@@ -126,7 +135,7 @@ class Issues(AuditModel):
     price_points = models.DecimalField(max_digits=10, decimal_places=2, blank=True, null=True)
     assignment_type = models.CharField(max_length=255, blank=True, null=True)
     priority = models.CharField(max_length=255, blank=True, null=True)
-    status = models.CharField(max_length=255, choices=Projects.status_choices, default='Not Started')
+    status = models.CharField(max_length=255, choices=issue_status_choices, default='Not Started')
 
     informed_by = models.ForeignKey(
         settings.AUTH_USER_MODEL, on_delete=models.SET_NULL, null=True, related_name='informed_issues'

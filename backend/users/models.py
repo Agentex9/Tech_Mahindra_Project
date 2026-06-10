@@ -7,8 +7,51 @@ from projects.models import AuditModel
 
 
 class User(AuditModel, AbstractUser):
+    class RoleChoices(models.TextChoices):
+        ADMIN = 'Admin', 'Admin'
+        PM = 'PM', 'PM'
+        DEVELOPER = 'Developer', 'Developer'
+
     role = models.CharField(max_length=50)
     points_balance = models.IntegerField(default=0)
+
+    @staticmethod
+    def normalize_role(role):
+        mapping = {
+            'admin': User.RoleChoices.ADMIN,
+            'pm': User.RoleChoices.PM,
+            'developer': User.RoleChoices.DEVELOPER,
+        }
+        if role is None:
+            return ''
+        normalized = str(role).strip().lower()
+        return mapping.get(normalized, str(role).strip())
+
+    def save(self, *args, **kwargs):
+        if self.is_superuser:
+            self.role = self.RoleChoices.ADMIN
+            self.is_staff = True
+        elif not self.role:
+            self.role = self.RoleChoices.DEVELOPER
+        else:
+            self.role = self.normalize_role(self.role)
+        super().save(*args, **kwargs)
+
+    @property
+    def is_admin_role(self):
+        return self.is_superuser or self.normalize_role(self.role) == self.RoleChoices.ADMIN
+
+    @property
+    def is_pm_role(self):
+        return self.normalize_role(self.role) == self.RoleChoices.PM
+
+    @property
+    def is_developer_role(self):
+        return self.normalize_role(self.role) == self.RoleChoices.DEVELOPER
+
+    @property
+    def is_privileged_role(self):
+        return self.is_admin_role or self.is_pm_role
 
     def __str__(self):
         return self.username

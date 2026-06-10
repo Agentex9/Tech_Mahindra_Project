@@ -26,6 +26,7 @@ urlpatterns = [
     path('api/docs/redoc/', SpectacularRedocView.as_view(url_name='schema'), name='redoc'),
     path('api/auth/', include('users.urls')),
     path('api/projects/', include('projects.urls')),
+    path('api/agents/', include('agents.urls')),
 ]
 
 if settings.DEBUG and getattr(settings, 'DEBUG_TOOLBAR_ENABLED', False):
